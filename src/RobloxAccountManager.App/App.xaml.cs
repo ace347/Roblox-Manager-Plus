@@ -49,8 +49,9 @@ public partial class App : WpfApp
         services.AddSingleton<IEncryptionService, DpapiEncryptionService>();
         services.AddScoped<IAccountService, AccountService>();
 
-        services.AddTransient<MainViewModel>();
-        services.AddTransient<MainWindow>();
+        services.AddSingleton<DashboardViewModel>();
+        services.AddSingleton<MainViewModel>();
+        services.AddSingleton<MainWindow>();
     }
 
     protected override void OnExit(ExitEventArgs e)

@@ -33,10 +33,10 @@ This document outlines the delivery phases, milestones, and verification criteri
 - [x] Verify clean baseline build (0 errors, 0 warnings) and all passing tests — `COMPLETED`
 
 ### Phase 2: WPF Dark-Themed Presentation Dashboard
-- [ ] Implement MainWindow and Shell navigation framework — `PLANNED`
-- [ ] Implement modern dark color palette (charcoal/slate/indigo) — `PLANNED`
-- [ ] Implement Accounts page with virtualized account cards — `PLANNED`
-- [ ] Implement Settings & Security overview panels — `PLANNED`
+- [x] Implement MainWindow and Shell navigation framework — `COMPLETED`
+- [x] Implement modern dark color palette (charcoal/slate/indigo & electric blue) — `COMPLETED`
+- [x] Implement DashboardView with metrics cards and recent accounts preview — `COMPLETED`
+- [x] Implement MVVM commands, mock data bindings, and unit tests — `COMPLETED`
 
 ### Phase 3: SQLite Database & Account CRUD
 - [ ] SQLite connection manager & auto-migration engine — `PLANNED`
