@@ -1,0 +1,31 @@
+## Build results
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+## Visual Studio / Code cache
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## Sensitive / Runtime Data
+*.db
+*.db-shm
+*.db-wal
+*.local.json
+secrets.json
+
+## Packages
+*.nupkg
+project.lock.json
+project.assets.json
+
+## Artifacts & Publishing
+artifacts/
+publish/
+dist/
+TestResults/
