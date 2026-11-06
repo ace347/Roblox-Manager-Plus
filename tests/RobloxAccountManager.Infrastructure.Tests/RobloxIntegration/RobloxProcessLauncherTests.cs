@@ -1,5 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
+using RobloxAccountManager.Core.Interfaces;
 using RobloxAccountManager.Core.Models;
 using RobloxAccountManager.Infrastructure.RobloxIntegration;
 using Xunit;
@@ -12,18 +14,24 @@ namespace RobloxAccountManager.Infrastructure.Tests.RobloxIntegration;
 /// </summary>
 public sealed class RobloxProcessLauncherTests : IDisposable
 {
-    // Temporary directory used for creating test .exe stubs.
     private readonly string _tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+    private readonly Mock<IAuthenticodeVerifier> _mockVerifier = new();
 
     public RobloxProcessLauncherTests()
     {
         Directory.CreateDirectory(_tempDir);
+        _mockVerifier
+            .Setup(v => v.VerifyFile(It.IsAny<string>(), It.IsAny<IEnumerable<string>>()))
+            .Returns(AuthenticodeResult.Success("CN=Roblox Corporation"));
     }
 
     public void Dispose()
     {
         try { Directory.Delete(_tempDir, recursive: true); } catch { /* best effort */ }
     }
+
+    private RobloxClientLocator CreateLocator() =>
+        new(_mockVerifier.Object, NullLogger<RobloxClientLocator>.Instance);
 
     // ── ValidateExecutablePath ─────────────────────────────────────────────
 
@@ -62,14 +70,12 @@ public sealed class RobloxProcessLauncherTests : IDisposable
     public void ValidateExecutablePath_FileDoesNotExist_ReturnsError()
     {
         var path = Path.Combine(_tempDir, "RobloxPlayerBeta.exe");
-        // Do NOT create the file.
         RobloxProcessLauncher.ValidateExecutablePath(path).Should().NotBeNullOrEmpty();
     }
 
     [Fact]
     public void ValidateExecutablePath_ValidPath_ReturnsNull()
     {
-        // Create a stub file of sufficient size.
         var path = Path.Combine(_tempDir, "RobloxPlayerBeta.exe");
         File.WriteAllBytes(path, new byte[70_000]);
 
@@ -126,7 +132,7 @@ public sealed class RobloxProcessLauncherTests : IDisposable
     [Fact]
     public async Task LaunchAsync_NonExistentExecutable_ReturnsFailed()
     {
-        var locator = new RobloxClientLocator(NullLogger<RobloxClientLocator>.Instance);
+        var locator = CreateLocator();
         var launcher = new RobloxProcessLauncher(locator, NullLogger<RobloxProcessLauncher>.Instance);
 
         var installation = new RobloxInstallation
@@ -134,7 +140,6 @@ public sealed class RobloxProcessLauncherTests : IDisposable
             ExecutablePath = Path.Combine(_tempDir, "RobloxPlayerBeta.exe"),
             Version = "version-nonexistent",
         };
-        // The file is NOT created — it must not exist.
 
         var result = await launcher.LaunchAsync(installation);
 
@@ -146,11 +151,10 @@ public sealed class RobloxProcessLauncherTests : IDisposable
     [Fact]
     public async Task LaunchAsync_InvalidPlaceUrlScheme_ReturnsFailed()
     {
-        // Even with a valid exe stub, an http URL must be rejected before launch.
         var exePath = Path.Combine(_tempDir, "RobloxPlayerBeta.exe");
         File.WriteAllBytes(exePath, new byte[70_000]);
 
-        var locator = new RobloxClientLocator(NullLogger<RobloxClientLocator>.Instance);
+        var locator = CreateLocator();
         var launcher = new RobloxProcessLauncher(locator, NullLogger<RobloxProcessLauncher>.Instance);
 
         var installation = new RobloxInstallation
@@ -168,7 +172,7 @@ public sealed class RobloxProcessLauncherTests : IDisposable
     [Fact]
     public async Task LaunchAsync_NullInstallation_ThrowsArgumentNull()
     {
-        var locator = new RobloxClientLocator(NullLogger<RobloxClientLocator>.Instance);
+        var locator = CreateLocator();
         var launcher = new RobloxProcessLauncher(locator, NullLogger<RobloxProcessLauncher>.Instance);
 
         await Assert.ThrowsAsync<ArgumentNullException>(() =>
@@ -180,22 +184,18 @@ public sealed class RobloxProcessLauncherTests : IDisposable
     [Fact]
     public async Task LaunchAsync_ValidControlledExe_Succeeds()
     {
-        // Use cmd.exe (always present on Windows) renamed to RobloxPlayerBeta.exe
-        // for a fully controlled launch test.  We pass /C exit to ensure it terminates quickly.
         var cmdPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe");
 
         if (!File.Exists(cmdPath))
         {
-            // Skip on non-Windows environments.
             return;
         }
 
-        // Copy cmd.exe as RobloxPlayerBeta.exe into temp dir.
         var exePath = Path.Combine(_tempDir, "RobloxPlayerBeta.exe");
         File.Copy(cmdPath, exePath, overwrite: true);
 
-        var locator = new RobloxClientLocator(NullLogger<RobloxClientLocator>.Instance);
+        var locator = CreateLocator();
         var launcher = new RobloxProcessLauncher(locator, NullLogger<RobloxProcessLauncher>.Instance);
 
         var installation = new RobloxInstallation
@@ -204,13 +204,11 @@ public sealed class RobloxProcessLauncherTests : IDisposable
             Version = "version-test",
         };
 
-        // No place URL — just launch the stub.
         var result = await launcher.LaunchAsync(installation, placeUrl: null);
 
         result.Success.Should().BeTrue();
         result.ProcessId.Should().BePositive();
 
-        // Clean up the launched process quickly.
         try
         {
             var process = System.Diagnostics.Process.GetProcessById(result.ProcessId!.Value);
@@ -219,4 +217,3 @@ public sealed class RobloxProcessLauncherTests : IDisposable
         catch { /* process may have already exited */ }
     }
 }
-

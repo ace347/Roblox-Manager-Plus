@@ -1,16 +1,19 @@
-using System.Security.Cryptography.X509Certificates;using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
+using RobloxAccountManager.Core.Interfaces;
 using RobloxAccountManager.Core.Models;
 
 namespace RobloxAccountManager.Infrastructure.RobloxIntegration;
 
 /// <summary>
 /// Discovers Roblox client installations from known local installation paths.
+/// Uses <see cref="IAuthenticodeVerifier"/> to cryptographically verify executable integrity,
+/// trust chain, and publisher authenticity via Windows WinVerifyTrust.
 /// Only reads file-system metadata — never accesses the network, browser cookies, or Roblox APIs.
 /// </summary>
 public sealed class RobloxClientLocator
 {
     // Known Roblox publisher Common Names used in Authenticode signatures.
-    private const string RobloxPublisherSubject = "Roblox Corporation";
+    private static readonly string[] RobloxPublisherSubstrings = ["Roblox Corporation"];
 
     // Roblox executable filename.
     private const string PlayerExecutableName = "RobloxPlayerBeta.exe";
@@ -32,11 +35,13 @@ public sealed class RobloxClientLocator
             "Roblox", "Versions"),
     ];
 
+    private readonly IAuthenticodeVerifier _authenticodeVerifier;
     private readonly ILogger<RobloxClientLocator> _logger;
 
     /// <summary>Initialises a new instance of <see cref="RobloxClientLocator"/>.</summary>
-    public RobloxClientLocator(ILogger<RobloxClientLocator> logger)
+    public RobloxClientLocator(IAuthenticodeVerifier authenticodeVerifier, ILogger<RobloxClientLocator> logger)
     {
+        _authenticodeVerifier = authenticodeVerifier ?? throw new ArgumentNullException(nameof(authenticodeVerifier));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -128,7 +133,8 @@ public sealed class RobloxClientLocator
             return null;
         }
 
-        // Basic sanity: refuse zero-byte or impossibly small files.
+        // Basic sanity check: refuse zero-byte or impossibly small files before parsing.
+        // NOTE: This size check is strictly an initial sanity filter, NOT a security verification.
         if (fileInfo.Length < 65_536)
         {
             _logger.LogWarning(
@@ -138,7 +144,17 @@ public sealed class RobloxClientLocator
         }
 
         var version = Path.GetFileName(versionDir); // e.g. "version-abc123"
-        var signatureVerified = VerifyAuthenticodeSignature(exePath);
+
+        // Cryptographic Authenticode & WinVerifyTrust evaluation
+        var verifyResult = _authenticodeVerifier.VerifyFile(exePath, RobloxPublisherSubstrings);
+        var signatureVerified = verifyResult.IsValid;
+
+        if (!signatureVerified)
+        {
+            _logger.LogWarning(
+                "Authenticode verification failed for {Path}: {Status} ({Message}, HRESULT: 0x{HResult:X8})",
+                exePath, verifyResult.Status, verifyResult.Message, verifyResult.RawHResult);
+        }
 
         return new RobloxInstallation
         {
@@ -147,53 +163,5 @@ public sealed class RobloxClientLocator
             IsSignatureVerified = signatureVerified,
             LastWriteUtc = fileInfo.LastWriteTimeUtc,
         };
-    }
-
-    /// <summary>
-    /// Verifies that the given file is Authenticode-signed by Roblox Corporation.
-    /// Returns <c>false</c> (not throws) if verification is not possible or fails.
-    /// </summary>
-    private bool VerifyAuthenticodeSignature(string filePath)
-    {
-        try
-        {
-            // Check whether the file is actually an Authenticode-signed PE.
-            var contentType = X509Certificate2.GetCertContentType(filePath);
-
-            if (contentType != X509ContentType.Authenticode)
-            {
-                _logger.LogDebug(
-                    "File at {Path} is not Authenticode-signed (content type: {Type}).", filePath, contentType);
-                return false;
-            }
-
-            // X509CertificateLoader does NOT support Authenticode PE files.
-            // The only built-in API is the legacy CreateFromSignedFile; suppress the SYSLIB0057 warning.
-#pragma warning disable SYSLIB0057 // X509Certificate.CreateFromSignedFile is obsolete — no replacement for Authenticode PE
-            using var legacyCert = X509Certificate.CreateFromSignedFile(filePath);
-#pragma warning restore SYSLIB0057
-            using var cert = new X509Certificate2(legacyCert);
-
-            var subject = cert.Subject;
-
-            // Check that the publisher CN contains "Roblox Corporation".
-            var verified = subject.Contains(RobloxPublisherSubject, StringComparison.OrdinalIgnoreCase);
-
-            if (!verified)
-            {
-                _logger.LogWarning(
-                    "Authenticode subject mismatch for {Path}. Expected to contain '{Expected}', got '{Actual}'.",
-                    filePath, RobloxPublisherSubject, subject);
-            }
-
-            return verified;
-        }
-        catch (Exception ex)
-        {
-            // CryptographicException is thrown when the file has no embedded signature
-            // or the signature is malformed.
-            _logger.LogDebug(ex, "Could not verify Authenticode signature for {Path}.", filePath);
-            return false;
-        }
     }
 }

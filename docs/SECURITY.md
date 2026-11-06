@@ -45,7 +45,26 @@ byte[] encryptedData = ProtectedData.Protect(
 
 ---
 
-## 3. Strict Prohibitions
+## 3. Binary Authenticity & Authenticode Verification
+
+To defend against binary spoofing, DLL hijacking, and modified/malicious executables placed in Roblox directories:
+
+### 3.1 Verification Architecture (`WinTrustAuthenticodeVerifier`)
+- **Native Subsystem:** Leverages Win32 `WinVerifyTrust` (`wintrust.dll`) with the `WINTRUST_ACTION_GENERIC_VERIFY_V2` policy provider.
+- **Cryptographic Digest Validation:** Evaluates PE file checksums and Authenticode hashes. If a signed executable has been tampered with or corrupted, WinVerifyTrust returns `TRUST_E_BAD_DIGEST` (`0x80096010`).
+- **Trust Chain & Root CA:** Checks that the certificate chain culminates in a trusted Root Certification Authority in the Windows certificate store. Untrusted roots return `CERT_E_UNTRUSTEDROOT` (`0x800B0109`).
+- **Revocation Enforcement:** Configured with `WTD_REVOCATION_CHECK_CHAIN` (`0x00000040`) and `WTD_CACHE_ONLY_URL_RETRIEVAL` (`0x00001000`) to check revocation status across all certificates in the chain using local CRL/OCSP cache without incurring blocking network hangs.
+- **Publisher Identity Match:** Matches the signer subject against expected publisher substrings (`Roblox Corporation`). Self-signed certificates or certificates from different publishers (e.g. untrusted third parties) are rejected.
+- **Size Sanity vs. Security:** Executable size checks (>= 65,536 bytes) and path validation are strictly initial sanity checks; they are **never** treated as cryptographic proof of authenticity.
+
+### 3.2 Security Guarantees & Platform Limitations
+- **Platform Specificity:** Win32 `WinVerifyTrust` is exclusive to Microsoft Windows.
+- **Revocation Offline Window:** Cached revocation checking cannot detect revocations issued after the local cache expires if the workstation remains completely offline.
+- **Local Administrator Trust:** An attacker with local Administrator privileges can install a rogue root certificate into the local machine's Trusted Root Certification Authorities store. Publisher subject verification provides secondary defense against this scenario.
+
+---
+
+## 4. Strict Prohibitions
 
 1. **No Code Injection:** We do not attach debuggers, inject DLLs, or modify memory of `RobloxPlayerBeta.exe`.
 2. **No Browser Cookie Harvesting:** We never read session databases from Chrome, Edge, or Firefox.

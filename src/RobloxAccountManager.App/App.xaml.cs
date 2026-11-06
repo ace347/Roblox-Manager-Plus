@@ -53,6 +53,7 @@ public partial class App : WpfApp
         services.AddSingleton<IAccountRepository, SqliteAccountRepository>();
         services.AddSingleton<IEncryptionService, DpapiEncryptionService>();
         services.AddSingleton<ICredentialVault, CredentialVault>();
+        services.AddSingleton<IAuthenticodeVerifier, WinTrustAuthenticodeVerifier>();
         services.AddSingleton<RobloxClientLocator>();
         services.AddSingleton<IRobloxLauncher, RobloxProcessLauncher>();
         services.AddScoped<IAccountService, AccountService>();
