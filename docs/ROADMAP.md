@@ -53,9 +53,13 @@ This document outlines the delivery phases, milestones, and verification criteri
 - [x] Update threat model & document managed-memory limitations honestly — `COMPLETED`
 
 ### Phase 5: Roblox Client Integration & Process Launcher
-- [ ] Detect official Roblox client installations across LocalAppData/ProgramFiles — `PLANNED`
-- [ ] Implement clean argument execution avoiding shell interpretation — `PLANNED`
-- [ ] Process status tracking and telemetry-free launch coordination — `PLANNED`
+- [x] `RobloxClientLocator` — discovers all installations under LocalAppData and ProgramFiles — `COMPLETED`
+- [x] Authenticode signature verification via `X509CertificateLoader` (publisher: Roblox Corporation) — `COMPLETED`
+- [x] `RobloxProcessLauncher` — implements `IRobloxLauncher`, safe `ProcessStartInfo.ArgumentList` launch — `COMPLETED`
+- [x] Executable path validation (absolute path, correct name, minimum file size) — `COMPLETED`
+- [x] Place URL validation (roblox:// scheme only; http/https/file/javascript rejected) — `COMPLETED`
+- [x] 10 automated tests (validation, missing Roblox, invalid URL scheme, controlled launch) — `COMPLETED`
+- [x] DI registration in App startup — `COMPLETED`
 
 ### Phase 6: Hardening, Sanitization & Privacy Assurance
 - [ ] Serilog sensitive token masking filter — `PLANNED`

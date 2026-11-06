@@ -6,6 +6,7 @@ using RobloxAccountManager.App.ViewModels;
 using RobloxAccountManager.Application.Services;
 using RobloxAccountManager.Core.Interfaces;
 using RobloxAccountManager.Infrastructure.Database;
+using RobloxAccountManager.Infrastructure.RobloxIntegration;
 using RobloxAccountManager.Infrastructure.Security;
 using Serilog;
 using WpfApp = System.Windows.Application;
@@ -52,6 +53,8 @@ public partial class App : WpfApp
         services.AddSingleton<IAccountRepository, SqliteAccountRepository>();
         services.AddSingleton<IEncryptionService, DpapiEncryptionService>();
         services.AddSingleton<ICredentialVault, CredentialVault>();
+        services.AddSingleton<RobloxClientLocator>();
+        services.AddSingleton<IRobloxLauncher, RobloxProcessLauncher>();
         services.AddScoped<IAccountService, AccountService>();
 
         services.AddSingleton<DashboardViewModel>();
