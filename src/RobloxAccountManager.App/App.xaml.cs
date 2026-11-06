@@ -51,6 +51,7 @@ public partial class App : WpfApp
 
         services.AddSingleton<IAccountRepository, SqliteAccountRepository>();
         services.AddSingleton<IEncryptionService, DpapiEncryptionService>();
+        services.AddSingleton<ICredentialVault, CredentialVault>();
         services.AddScoped<IAccountService, AccountService>();
 
         services.AddSingleton<DashboardViewModel>();

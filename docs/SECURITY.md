@@ -17,20 +17,31 @@ The primary assets requiring protection in this application are:
 
 ---
 
-## 2. Cryptographic Design (DPAPI)
+## 2. Cryptographic Architecture (Windows DPAPI & CredentialVault)
 
-Windows Data Protection API (DPAPI) uses cryptographic keys derived from the user's Windows login credentials:
-
+### 2.1 Encryption Standard
+Windows Data Protection API (DPAPI) is used exclusively:
 ```csharp
 byte[] encryptedData = ProtectedData.Protect(
-    userDataBytes, 
+    plaintextBytes, 
     optionalEntropy, 
     DataProtectionScope.CurrentUser
 );
 ```
 
-- **Scope:** `DataProtectionScope.CurrentUser`.
-- **Optional Entropy:** An application-specific salt is mixed into the encryption context to ensure blobs from this application cannot be trivially decrypted by generic DPAPI inspection tools without knowing the contextual entropy.
+- **Scope:** `DataProtectionScope.CurrentUser`. The master key is derived directly from the logged-in Windows user's credential hierarchy.
+- **Per-Record Entropy:** Every encrypted secret is paired with an independently generated 32-byte cryptographic salt (`RandomNumberGenerator.Fill(entropy)`), preventing correlation across entries.
+- **Zero Fallback:** If DPAPI is unavailable or throws a `CryptographicException`, the application fails safely. There is **zero plaintext fallback**.
+
+### 2.2 In-Memory Lifetime & Memory Wiping
+- All sensitive cryptographic keys and session secrets are wrapped in [`SensitiveBuffer`](file:///c:/Users/A%20S%20U%20S/Documents/REEA/src/RobloxAccountManager.Core/Security/SensitiveBuffer.cs).
+- On disposal, `CryptographicOperations.ZeroMemory` is called immediately on the underlying byte array.
+- **Honest Managed Memory Limitation:** While `ZeroMemory` wipes the active pinned byte array, the .NET CLR and Garbage Collector may have relocated or cached transient representations in virtual memory prior to disposal. DPAPI current-user protection serves as the primary disk defense; `SensitiveBuffer` serves as defense-in-depth against lingering process memory.
+
+### 2.3 Residual Risks & What DPAPI Does NOT Protect Against
+- **Same-User Process Inspection:** Any process running under the exact same Windows user account (with identical user SID/privileges) can theoretically invoke `ProtectedData.Unprotect` if it extracts both the encrypted blob and per-record entropy.
+- **Kernel / SYSTEM Privilege Escalation:** An attacker with local Administrator or `NT AUTHORITY\SYSTEM` privileges can dump process memory or acquire DPAPI system keys.
+- **Compromised Machine / Keyloggers:** DPAPI protects data at rest; it cannot protect against active ring-3 userland keyloggers running under the same user session.
 
 ---
 

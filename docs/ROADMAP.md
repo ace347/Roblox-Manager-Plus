@@ -46,9 +46,11 @@ This document outlines the delivery phases, milestones, and verification criteri
 - [x] Automated tests for SQLite repository (CRUD, search, default swapping) — `COMPLETED`
 
 ### Phase 4: DPAPI Security & Credential Management
-- [ ] Implement `DpapiEncryptionService` with `DataProtectionScope.CurrentUser` — `PLANNED`
-- [ ] Sensitive memory disposal helpers — `PLANNED`
-- [ ] Automated security tests for encryption roundtrips and tampered payloads — `PLANNED`
+- [x] Implement `DpapiEncryptionService` with `DataProtectionScope.CurrentUser` & per-record entropy — `COMPLETED`
+- [x] Implement `SensitiveBuffer` with `CryptographicOperations.ZeroMemory` buffer wiping — `COMPLETED`
+- [x] Implement `CredentialVault` separating credential storage from plain account metadata — `COMPLETED`
+- [x] Automated security test suite (empty inputs, corrupted blobs, entropy mismatch, 1MB large inputs) — `COMPLETED`
+- [x] Update threat model & document managed-memory limitations honestly — `COMPLETED`
 
 ### Phase 5: Roblox Client Integration & Process Launcher
 - [ ] Detect official Roblox client installations across LocalAppData/ProgramFiles — `PLANNED`
