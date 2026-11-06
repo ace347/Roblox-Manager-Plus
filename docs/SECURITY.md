@@ -51,15 +51,18 @@ To defend against binary spoofing, DLL hijacking, and modified/malicious executa
 
 ### 3.1 Verification Architecture (`WinTrustAuthenticodeVerifier`)
 - **Native Subsystem:** Leverages Win32 `WinVerifyTrust` (`wintrust.dll`) with the `WINTRUST_ACTION_GENERIC_VERIFY_V2` policy provider.
+- **State Action Lifecycle:** Follows the full two-stage WinTrust state lifecycle: `WTD_STATEACTION_VERIFY` followed by an explicit `WTD_STATEACTION_CLOSE` call to release provider-allocated state structures (`hWVTStateData`) and prevent native memory leaks.
 - **Cryptographic Digest Validation:** Evaluates PE file checksums and Authenticode hashes. If a signed executable has been tampered with or corrupted, WinVerifyTrust returns `TRUST_E_BAD_DIGEST` (`0x80096010`).
 - **Trust Chain & Root CA:** Checks that the certificate chain culminates in a trusted Root Certification Authority in the Windows certificate store. Untrusted roots return `CERT_E_UNTRUSTEDROOT` (`0x800B0109`).
-- **Revocation Enforcement:** Configured with `WTD_REVOCATION_CHECK_CHAIN` (`0x00000040`) and `WTD_CACHE_ONLY_URL_RETRIEVAL` (`0x00001000`) to check revocation status across all certificates in the chain using local CRL/OCSP cache without incurring blocking network hangs.
-- **Publisher Identity Match:** Matches the signer subject against expected publisher substrings (`Roblox Corporation`). Self-signed certificates or certificates from different publishers (e.g. untrusted third parties) are rejected.
+- **Revocation Enforcement:** Configured with `WTD_REVOCATION_CHECK_CHAIN` (`0x00000040`) and `WTD_CACHE_ONLY_URL_RETRIEVAL` (`0x00001000`). This enforces revocation validation across all certificates in the chain using the local machine's CRL/OCSP cache without incurring blocking network hangs.
+- **Distinction for Offline Revocation:** When revocation information is unavailable or offline, the verifier explicitly returns `AuthenticodeStatus.RevocationOfflineOrUnavailable` (`0x80092013` / `CRYPT_E_REVOCATION_OFFLINE`) rather than claiming fresh online verification or silently ignoring revocation failure.
+- **Publisher Identity Match:** Matches the signer certificate's exact Subject Common Name (`X509NameType.SimpleName`, e.g., `"Roblox Corporation"`) rather than relying on loose substring matching, protecting against substring-based spoofing (e.g. `CN=Roblox Corporation Fake`).
+- **Certificate Rollover Policy:** Roblox Corporation periodically rotates its code-signing certificates upon expiration (e.g., renewed DigiCert EV/OV code signing certificates). The system matches the canonical publisher Subject Common Name (`Roblox Corporation`), which remains stable across certificate renewals while requiring that each new certificate chains to an OS-trusted root.
 - **Size Sanity vs. Security:** Executable size checks (>= 65,536 bytes) and path validation are strictly initial sanity checks; they are **never** treated as cryptographic proof of authenticity.
 
 ### 3.2 Security Guarantees & Platform Limitations
 - **Platform Specificity:** Win32 `WinVerifyTrust` is exclusive to Microsoft Windows.
-- **Revocation Offline Window:** Cached revocation checking cannot detect revocations issued after the local cache expires if the workstation remains completely offline.
+- **Revocation Offline Window:** Cached revocation checking (`WTD_CACHE_ONLY_URL_RETRIEVAL`) relies on local CRL/OCSP caches. It cannot detect a newly revoked certificate if the revocation list has not yet been fetched to the local machine and network fetching is prevented. When cached revocation data is missing/stale, `WinVerifyTrust` fails safely with `CRYPT_E_REVOCATION_OFFLINE`.
 - **Local Administrator Trust:** An attacker with local Administrator privileges can install a rogue root certificate into the local machine's Trusted Root Certification Authorities store. Publisher subject verification provides secondary defense against this scenario.
 
 ---

@@ -12,10 +12,11 @@ public interface IAuthenticodeVerifier
     /// Evaluates signature integrity, trust chain, revocation status, and publisher identity.
     /// </summary>
     /// <param name="filePath">Absolute path to the executable or library.</param>
-    /// <param name="expectedPublisherSubstrings">
-    /// Optional publisher substrings that must be present in the signer subject (e.g., "Roblox Corporation").
-    /// If null or empty, only signature and trust validity are evaluated.
+    /// <param name="expectedPublishers">
+    /// Optional collection of exact publisher Subject Common Names (e.g., "Roblox Corporation")
+    /// that the signer certificate must match. If null or empty, any valid trusted publisher is accepted.
     /// </param>
     /// <returns>An <see cref="AuthenticodeResult"/> detailing verification outcome.</returns>
-    AuthenticodeResult VerifyFile(string filePath, IEnumerable<string>? expectedPublisherSubstrings = null);
+    AuthenticodeResult VerifyFile(string filePath, IEnumerable<string>? expectedPublishers = null);
 }
+

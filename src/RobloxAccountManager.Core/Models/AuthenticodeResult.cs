@@ -26,6 +26,9 @@ public enum AuthenticodeStatus
     /// <summary>The certificate or publisher was explicitly marked as distrusted on this system.</summary>
     ExplicitlyDistrusted,
 
+    /// <summary>Revocation status could not be verified because revocation server/cache was offline or unavailable.</summary>
+    RevocationOfflineOrUnavailable,
+
     /// <summary>A certificate chain could not be built to a trusted root authority.</summary>
     ChainingError,
 
@@ -79,3 +82,4 @@ public sealed class AuthenticodeResult
             Message = message
         };
 }
+

@@ -31,5 +31,9 @@ Our testing framework ensures defensive security, data integrity, and UI stabili
 | **Authenticode: Unsigned Binary** | Test non-signed file stub | Rejects with `NotSigned` (`0x800B0100`). |
 | **Authenticode: Tampered Binary** | Corrupt bytes of signed binary | Rejects with `CorruptedOrModified` (`0x80096010`). |
 | **Authenticode: Publisher Mismatch** | Valid Microsoft binary matched against "Roblox" | Signature valid, rejects with `PublisherMismatch`. |
+| **Authenticode: Substring Spoofing** | Reject partial or spoofed CN (e.g. "Windows" vs "Microsoft Windows") | Exact CN check rejects partial string with `PublisherMismatch`. |
 | **Authenticode: Missing File** | Test non-existent path | Fails safely with `FileNotFound`. |
+
+### 4. Controlled Testing Limitations
+- **Revoked / Expired Real Certificates:** Generating binaries signed with certificates that are simultaneously timestamped, chained to a public CA, and revoked or expired requires live test infrastructure or mutating system certificate stores. Automated integration tests cover genuine Windows system binaries, uncorrupted signatures, tampered digests, and publisher mismatch. Expired, revoked, and explicitly distrusted statuses are tested via status code mapping and system trust provider unit contracts.
 

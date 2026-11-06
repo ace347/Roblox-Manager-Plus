@@ -12,8 +12,8 @@ namespace RobloxAccountManager.Infrastructure.RobloxIntegration;
 /// </summary>
 public sealed class RobloxClientLocator
 {
-    // Known Roblox publisher Common Names used in Authenticode signatures.
-    private static readonly string[] RobloxPublisherSubstrings = ["Roblox Corporation"];
+    // Known official Roblox publisher Common Names (exact Subject Common Name match).
+    private static readonly string[] ExpectedPublishers = ["Roblox Corporation"];
 
     // Roblox executable filename.
     private const string PlayerExecutableName = "RobloxPlayerBeta.exe";
@@ -146,7 +146,7 @@ public sealed class RobloxClientLocator
         var version = Path.GetFileName(versionDir); // e.g. "version-abc123"
 
         // Cryptographic Authenticode & WinVerifyTrust evaluation
-        var verifyResult = _authenticodeVerifier.VerifyFile(exePath, RobloxPublisherSubstrings);
+        var verifyResult = _authenticodeVerifier.VerifyFile(exePath, ExpectedPublishers);
         var signatureVerified = verifyResult.IsValid;
 
         if (!signatureVerified)

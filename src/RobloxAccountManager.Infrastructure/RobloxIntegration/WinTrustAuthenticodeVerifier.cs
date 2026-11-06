@@ -11,9 +11,10 @@ namespace RobloxAccountManager.Infrastructure.RobloxIntegration;
 /// Performs comprehensive checks including:
 /// - Cryptographic digest and file integrity (detects tamper/corruption)
 /// - Certificate trust chain validation to a trusted Root Certification Authority
-/// - Revocation checking policy enforcement
+/// - Revocation checking policy enforcement with offline/unavailable distinction
 /// - Expiration and timestamp token validation
-/// - Signer certificate subject identity matching
+/// - Signer certificate Subject Common Name exact matching (prevents substring spoofing)
+/// - Full two-stage state lifecycle (WTD_STATEACTION_VERIFY followed by WTD_STATEACTION_CLOSE)
 /// </summary>
 public sealed class WinTrustAuthenticodeVerifier : IAuthenticodeVerifier
 {
@@ -37,6 +38,11 @@ public sealed class WinTrustAuthenticodeVerifier : IAuthenticodeVerifier
     private const int CRYPT_E_REVOCATION_OFFLINE = unchecked((int)0x80092013);
     private const int NTE_BAD_SIGNATURE = unchecked((int)0x80090006);
 
+    // WinTrust State Action Constants
+    private const uint WTD_STATEACTION_IGNORE = 0x00000000;
+    private const uint WTD_STATEACTION_VERIFY = 0x00000001;
+    private const uint WTD_STATEACTION_CLOSE = 0x00000002;
+
     private readonly ILogger<WinTrustAuthenticodeVerifier> _logger;
 
     public WinTrustAuthenticodeVerifier(ILogger<WinTrustAuthenticodeVerifier> logger)
@@ -45,7 +51,7 @@ public sealed class WinTrustAuthenticodeVerifier : IAuthenticodeVerifier
     }
 
     /// <inheritdoc/>
-    public AuthenticodeResult VerifyFile(string filePath, IEnumerable<string>? expectedPublisherSubstrings = null)
+    public AuthenticodeResult VerifyFile(string filePath, IEnumerable<string>? expectedPublishers = null)
     {
         if (string.IsNullOrWhiteSpace(filePath))
         {
@@ -63,11 +69,11 @@ public sealed class WinTrustAuthenticodeVerifier : IAuthenticodeVerifier
                 $"File does not exist: {filePath}");
         }
 
-        // Step 1: Execute WinVerifyTrust via P/Invoke
+        // Step 1: Execute WinVerifyTrust with proper state lifecycle and resource cleanup
         int hresult = ExecuteWinVerifyTrust(filePath);
 
-        // Step 2: Extract Signer Certificate Subject if an Authenticode block exists
-        string signerSubject = ExtractSignerSubject(filePath);
+        // Step 2: Extract Signer Certificate Subject & Simple Display Name
+        var (signerSubject, signerCommonName) = ExtractSignerInfo(filePath);
 
         // Step 3: Map WinVerifyTrust HRESULT to AuthenticodeStatus
         switch (hresult)
@@ -137,12 +143,11 @@ public sealed class WinTrustAuthenticodeVerifier : IAuthenticodeVerifier
 
             case CERT_E_REVOCATION_FAILURE:
             case CRYPT_E_REVOCATION_OFFLINE:
-                _logger.LogWarning("Revocation server offline for binary: {Path} (0x{HResult:X8})", filePath, hresult);
-                // When revocation server is unreachable, we report verification failure unless policy specifies otherwise
+                _logger.LogWarning("Revocation server offline or cached data unavailable: {Path} (0x{HResult:X8})", filePath, hresult);
                 return AuthenticodeResult.Failure(
-                    AuthenticodeStatus.VerificationFailed,
+                    AuthenticodeStatus.RevocationOfflineOrUnavailable,
                     hresult,
-                    "Revocation status could not be verified because revocation server is offline.",
+                    "Revocation status could not be verified because revocation server/cache is offline or unavailable.",
                     signerSubject);
 
             default:
@@ -154,14 +159,26 @@ public sealed class WinTrustAuthenticodeVerifier : IAuthenticodeVerifier
                     signerSubject);
         }
 
-        // Step 4: Validate Publisher Identity against expected substrings
-        if (expectedPublisherSubstrings is not null)
+        // Step 4: Validate Publisher Identity against expected publisher names
+        // Matches exact Subject Common Name (Simple Name) to prevent substring-based spoofing
+        if (expectedPublishers is not null)
         {
             var matchFound = false;
-            foreach (var expected in expectedPublisherSubstrings)
+            foreach (var expected in expectedPublishers)
             {
-                if (!string.IsNullOrEmpty(expected) &&
-                    signerSubject.Contains(expected, StringComparison.OrdinalIgnoreCase))
+                if (string.IsNullOrWhiteSpace(expected))
+                    continue;
+
+                // 1. Strict equality check against extracted Common Name (e.g., "Roblox Corporation")
+                if (string.Equals(signerCommonName, expected, StringComparison.OrdinalIgnoreCase))
+                {
+                    matchFound = true;
+                    break;
+                }
+
+                // 2. Strict exact RDN segment match against Subject DN: "CN=Roblox Corporation"
+                if (signerSubject.Contains($"CN={expected},", StringComparison.OrdinalIgnoreCase) ||
+                    signerSubject.EndsWith($"CN={expected}", StringComparison.OrdinalIgnoreCase))
                 {
                     matchFound = true;
                     break;
@@ -171,20 +188,20 @@ public sealed class WinTrustAuthenticodeVerifier : IAuthenticodeVerifier
             if (!matchFound)
             {
                 _logger.LogWarning(
-                    "Publisher identity mismatch for {Path}. Signer: '{Signer}'.",
-                    filePath, signerSubject);
+                    "Publisher identity mismatch for {Path}. Signer Common Name: '{CN}', Subject DN: '{Subject}'.",
+                    filePath, signerCommonName, signerSubject);
 
                 return AuthenticodeResult.Failure(
                     AuthenticodeStatus.PublisherMismatch,
                     hresult,
-                    $"Signature is valid, but publisher '{signerSubject}' did not match expected identity.",
+                    $"Signature is valid, but signer Common Name '{signerCommonName}' did not match expected publisher.",
                     signerSubject);
             }
         }
 
         _logger.LogInformation(
-            "Authenticode signature valid and verified for {Path}. Signer: '{Signer}'",
-            filePath, signerSubject);
+            "Authenticode signature valid and verified for {Path}. Signer: '{Signer}' (CN: '{CN}')",
+            filePath, signerSubject, signerCommonName);
 
         return AuthenticodeResult.Success(signerSubject, hresult);
     }
@@ -208,7 +225,7 @@ public sealed class WinTrustAuthenticodeVerifier : IAuthenticodeVerifier
         trustData.fdwRevocationChecks = 0; // WTD_REVOKE_NONE (revocation governed by dwProvFlags)
         trustData.dwUnionChoice = 1; // WTD_CHOICE_FILE
         trustData.pFile = pFileInfo;
-        trustData.dwStateAction = 0; // WTD_STATEACTION_IGNORE
+        trustData.dwStateAction = WTD_STATEACTION_VERIFY; // Allocate and populate state data
         trustData.hWVTStateData = IntPtr.Zero;
         trustData.pwszURLReference = IntPtr.Zero;
 
@@ -220,9 +237,22 @@ public sealed class WinTrustAuthenticodeVerifier : IAuthenticodeVerifier
         IntPtr pTrustData = Marshal.AllocHGlobal(Marshal.SizeOf<WINTRUST_DATA>());
         Marshal.StructureToPtr(trustData, pTrustData, false);
 
+        int result;
         try
         {
-            return WinVerifyTrust(new IntPtr(-1), ActionGenericVerifyV2, pTrustData);
+            // First call: Verify and obtain state handle
+            result = WinVerifyTrust(new IntPtr(-1), ActionGenericVerifyV2, pTrustData);
+
+            // Read updated structure back to get populated hWVTStateData handle
+            trustData = Marshal.PtrToStructure<WINTRUST_DATA>(pTrustData);
+
+            // Second call: Close and release provider state data if allocated
+            if (trustData.hWVTStateData != IntPtr.Zero)
+            {
+                trustData.dwStateAction = WTD_STATEACTION_CLOSE;
+                Marshal.StructureToPtr(trustData, pTrustData, false);
+                _ = WinVerifyTrust(new IntPtr(-1), ActionGenericVerifyV2, pTrustData);
+            }
         }
         finally
         {
@@ -230,9 +260,11 @@ public sealed class WinTrustAuthenticodeVerifier : IAuthenticodeVerifier
             Marshal.FreeHGlobal(pFileInfo);
             Marshal.FreeHGlobal(pTrustData);
         }
+
+        return result;
     }
 
-    private static string ExtractSignerSubject(string filePath)
+    private static (string subject, string commonName) ExtractSignerInfo(string filePath)
     {
         try
         {
@@ -242,15 +274,17 @@ public sealed class WinTrustAuthenticodeVerifier : IAuthenticodeVerifier
                 using var legacyCert = X509Certificate.CreateFromSignedFile(filePath);
 #pragma warning restore SYSLIB0057
                 using var cert2 = new X509Certificate2(legacyCert);
-                return cert2.Subject;
+                var subject = cert2.Subject;
+                var commonName = cert2.GetNameInfo(X509NameType.SimpleName, forIssuer: false) ?? string.Empty;
+                return (subject, commonName);
             }
         }
         catch
         {
-            // Best effort; WinVerifyTrust handles cryptographic validity
+            // Best effort extraction; WinVerifyTrust handles cryptographic validity
         }
 
-        return string.Empty;
+        return (string.Empty, string.Empty);
     }
 
     #region Win32 P/Invoke Declarations

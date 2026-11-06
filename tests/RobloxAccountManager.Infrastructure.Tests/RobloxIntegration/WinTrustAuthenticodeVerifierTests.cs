@@ -13,7 +13,8 @@ namespace RobloxAccountManager.Infrastructure.Tests.RobloxIntegration;
 /// 2. Unsigned executable rejection
 /// 3. Modified/corrupted binary rejection (tampered digest)
 /// 4. Valid signed binary (Windows system binary)
-/// 5. Publisher identity validation and mismatch handling
+/// 5. Publisher identity validation and exact CN matching (prevents substring spoofing)
+/// 6. Substring spoofing rejection (e.g. "NotRoblox Corporation" or "Roblox Corporation Fake")
 /// </summary>
 public sealed class WinTrustAuthenticodeVerifierTests : IDisposable
 {
@@ -28,6 +29,21 @@ public sealed class WinTrustAuthenticodeVerifierTests : IDisposable
     public void Dispose()
     {
         try { Directory.Delete(_tempDir, recursive: true); } catch { /* best effort */ }
+    }
+
+    private static string? GetValidSystemSignedExe()
+    {
+        var candidates = new[] { "consent.exe", "svchost.exe", "cmd.exe" };
+        var systemPath = Environment.GetFolderPath(Environment.SpecialFolder.System);
+
+        foreach (var candidate in candidates)
+        {
+            var fullPath = Path.Combine(systemPath, candidate);
+            if (File.Exists(fullPath))
+                return fullPath;
+        }
+
+        return null;
     }
 
     // ── 1. Missing Executable ──────────────────────────────────────────────
@@ -61,7 +77,6 @@ public sealed class WinTrustAuthenticodeVerifierTests : IDisposable
     public void VerifyFile_UnsignedBinary_ReturnsNotSigned()
     {
         var path = Path.Combine(_tempDir, "UnsignedApp.exe");
-        // Write raw bytes representing an unsigned executable file
         File.WriteAllBytes(path, new byte[70_000]);
 
         var result = _verifier.VerifyFile(path);
@@ -76,20 +91,9 @@ public sealed class WinTrustAuthenticodeVerifierTests : IDisposable
     [Fact]
     public void VerifyFile_TamperedSignedBinary_ReturnsCorruptedOrModified()
     {
-        // Find a standard signed Windows system executable
-        var systemExe = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "consent.exe");
-        if (!File.Exists(systemExe))
-        {
-            // Fallback to svchost or notepad if consent.exe is missing
-            systemExe = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "svchost.exe");
-        }
+        var systemExe = GetValidSystemSignedExe();
+        if (systemExe is null) return;
 
-        if (!File.Exists(systemExe))
-        {
-            return; // Skip on non-standard Windows installations
-        }
-
-        // Copy the genuine signed binary to temp folder
         var tamperedPath = Path.Combine(_tempDir, "Tampered.exe");
         var bytes = File.ReadAllBytes(systemExe);
 
@@ -109,18 +113,9 @@ public sealed class WinTrustAuthenticodeVerifierTests : IDisposable
     [Fact]
     public void VerifyFile_ValidSignedWindowsBinary_ReturnsValid()
     {
-        var systemExe = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "consent.exe");
-        if (!File.Exists(systemExe))
-        {
-            systemExe = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "svchost.exe");
-        }
+        var systemExe = GetValidSystemSignedExe();
+        if (systemExe is null) return;
 
-        if (!File.Exists(systemExe))
-        {
-            return;
-        }
-
-        // Verify without publisher constraint
         var result = _verifier.VerifyFile(systemExe);
 
         result.IsValid.Should().BeTrue();
@@ -134,19 +129,10 @@ public sealed class WinTrustAuthenticodeVerifierTests : IDisposable
     [Fact]
     public void VerifyFile_ExpectedPublisherMatched_ReturnsValid()
     {
-        var systemExe = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "consent.exe");
-        if (!File.Exists(systemExe))
-        {
-            systemExe = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "svchost.exe");
-        }
+        var systemExe = GetValidSystemSignedExe();
+        if (systemExe is null) return;
 
-        if (!File.Exists(systemExe))
-        {
-            return;
-        }
-
-        // Expect Microsoft Corporation
-        var result = _verifier.VerifyFile(systemExe, ["Microsoft Corporation", "Microsoft Windows"]);
+        var result = _verifier.VerifyFile(systemExe, ["Microsoft Windows", "Microsoft Corporation"]);
 
         result.IsValid.Should().BeTrue();
         result.Status.Should().Be(AuthenticodeStatus.Valid);
@@ -155,23 +141,29 @@ public sealed class WinTrustAuthenticodeVerifierTests : IDisposable
     [Fact]
     public void VerifyFile_PublisherMismatch_ReturnsPublisherMismatch()
     {
-        var systemExe = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "consent.exe");
-        if (!File.Exists(systemExe))
-        {
-            systemExe = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "svchost.exe");
-        }
-
-        if (!File.Exists(systemExe))
-        {
-            return;
-        }
+        var systemExe = GetValidSystemSignedExe();
+        if (systemExe is null) return;
 
         // Expect Roblox Corporation on a Microsoft binary -> must fail with PublisherMismatch
         var result = _verifier.VerifyFile(systemExe, ["Roblox Corporation"]);
 
         result.IsValid.Should().BeFalse();
         result.Status.Should().Be(AuthenticodeStatus.PublisherMismatch);
-        result.Message.Should().Contain("did not match expected identity");
+        result.Message.Should().Contain("did not match expected publisher");
         result.SignerSubject.Should().Contain("Microsoft");
+    }
+
+    [Fact]
+    public void VerifyFile_SubstringSpoofingPublisher_IsRejected()
+    {
+        var systemExe = GetValidSystemSignedExe();
+        if (systemExe is null) return;
+
+        // Microsoft Windows is the genuine publisher. Testing that a partial substring or spoofed publisher like "Microsoft Windows Fake" is rejected
+        var result = _verifier.VerifyFile(systemExe, ["Microsoft Windows Fake", "Windows"]);
+
+        // Since "Windows" alone is not the full Common Name "Microsoft Windows", it must be rejected unless exact Common Name matches
+        result.IsValid.Should().BeFalse();
+        result.Status.Should().Be(AuthenticodeStatus.PublisherMismatch);
     }
 }
