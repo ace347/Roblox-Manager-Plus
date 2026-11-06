@@ -27,3 +27,4 @@ Our testing framework ensures defensive security, data integrity, and UI stabili
 | **Entropy Verification** | Decrypt with invalid entropy | CryptographicException thrown; no secret revealed. |
 | **Tampered Ciphertext** | Flip random bits in encrypted blob | CryptographicException thrown; fails safely. |
 | **SQL Injection Check** | Inject SQL injection strings into usernames | Stored safely via parameters; no SQL execution error. |
+

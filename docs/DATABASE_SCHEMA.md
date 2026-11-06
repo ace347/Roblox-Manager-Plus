@@ -43,3 +43,4 @@ CREATE TABLE IF NOT EXISTS AppSettings (
 
 - Migrations are versioned sequentially (`001_initial_schema.sql`, etc.) and applied inside a single database transaction upon application startup.
 - All column mutations and table upgrades run idempotently.
+

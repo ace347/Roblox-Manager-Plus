@@ -68,3 +68,4 @@ For full setup and developer instructions, see [docs/DEVELOPMENT.md](docs/DEVELO
 ## Security & Ethics Policy
 
 See [docs/SECURITY.md](docs/SECURITY.md) for vulnerability reporting and our defensive threat model. This software does not attempt to bypass Roblox authentication protocols or inject unauthorized code into running game processes.
+

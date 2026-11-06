@@ -33,3 +33,4 @@ The application launches the official desktop client installed on the local syst
   - Launched via .NET `System.Diagnostics.Process` with explicit argument collections.
   - Never invoked via shell interpreters (`cmd.exe /c` or `powershell.exe`).
   - No DLL injection, memory patching, or API hooking.
+

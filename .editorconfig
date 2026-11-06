@@ -22,3 +22,4 @@ csharp_prefer_braces = true:suggestion
 csharp_style_var_when_type_is_apparent = true:suggestion
 csharp_style_expression_bodied_methods = when_on_single_line:suggestion
 csharp_style_namespace_declarations = file_scoped:warning
+

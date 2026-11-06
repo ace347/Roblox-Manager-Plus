@@ -26,3 +26,4 @@ try {
 }
 
 Write-Host "`nEnvironment verification finished." -ForegroundColor Cyan
+

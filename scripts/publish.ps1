@@ -13,3 +13,4 @@ dotnet publish ./src/RobloxAccountManager.App/RobloxAccountManager.App.csproj `
     --output $OutputPath
 
 Write-Host "Application published to $OutputPath" -ForegroundColor Green
+

@@ -64,3 +64,4 @@ This document outlines the delivery phases, milestones, and verification criteri
 - [ ] Production build and single-file publish profiling — `PLANNED`
 - [ ] Installer setup configuration — `PLANNED`
 - [ ] User documentation and release notes — `PLANNED`
+

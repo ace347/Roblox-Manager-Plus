@@ -39,3 +39,4 @@ byte[] encryptedData = ProtectedData.Protect(
 1. **No Code Injection:** We do not attach debuggers, inject DLLs, or modify memory of `RobloxPlayerBeta.exe`.
 2. **No Browser Cookie Harvesting:** We never read session databases from Chrome, Edge, or Firefox.
 3. **No Auth Bypass:** We rely exclusively on official authentication pathways and client protocols.
+

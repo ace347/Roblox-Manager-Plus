@@ -66,3 +66,4 @@ sequenceDiagram
 1. Credentials remain encrypted in the SQLite database file at all times.
 2. Credentials are only decrypted into memory immediately prior to handoff.
 3. Once the handoff completes, in-memory credential buffers are cleared.
+

@@ -49,3 +49,4 @@ This document defines functional (FR), non-functional (NFR), security (SEC), and
 | **PERF-001** | Rapid Startup | Cold start time to interactive dashboard under 1.5 seconds. | High |
 | **PERF-002** | UI Virtualization | Account list must use WPF item virtualization (`VirtualizingStackPanel`) to maintain 60 FPS scrolling. | High |
 | **PERF-003** | Idle Memory Footprint | Memory consumption while idling in background should remain under 60 MB. | Medium |
+

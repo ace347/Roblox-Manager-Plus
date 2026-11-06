@@ -15,3 +15,4 @@ The project requires a secure, high-performance, private Windows desktop applica
 ## Consequences
 - The application is native to Windows and cannot run cross-platform without porting UI to Avalonia/MAUI, which matches the Windows-only scope.
 - Central Package Management will ensure aligned versions across all projects.
+
