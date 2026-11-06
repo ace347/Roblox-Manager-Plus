@@ -2,16 +2,19 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using RobloxAccountManager.App.Models;
+using RobloxAccountManager.Application.Services;
 
 namespace RobloxAccountManager.App.ViewModels;
 
 public partial class DashboardViewModel : ObservableObject
 {
-    [ObservableProperty]
-    private int _totalAccountsCount = 3;
+    private readonly IAccountService _accountService;
 
     [ObservableProperty]
-    private int _activeSessionsCount = 1;
+    private int _totalAccountsCount;
+
+    [ObservableProperty]
+    private int _activeSessionsCount;
 
     [ObservableProperty]
     private string _securityStatus = "DPAPI Encrypted (Protected)";
@@ -21,41 +24,32 @@ public partial class DashboardViewModel : ObservableObject
 
     public ObservableCollection<AccountDisplayModel> RecentAccounts { get; } = new();
 
-    public DashboardViewModel()
+    public DashboardViewModel(IAccountService accountService)
     {
-        LoadMockData();
+        _accountService = accountService;
     }
 
-    private void LoadMockData()
+    public async Task RefreshAsync()
     {
-        RecentAccounts.Add(new AccountDisplayModel
-        {
-            Username = "Valkyrie_Hero",
-            DisplayName = "Valkyrie",
-            Tag = "Main",
-            IsDefault = true,
-            LastActive = "2 hours ago"
-        });
+        var accounts = await _accountService.GetAccountsAsync();
+        TotalAccountsCount = accounts.Count;
+        RecentAccounts.Clear();
 
-        RecentAccounts.Add(new AccountDisplayModel
+        foreach (var acc in accounts.Take(5))
         {
-            Username = "RobloxDev_Studio",
-            DisplayName = "Studio Dev",
-            Tag = "Developer",
-            IsDefault = false,
-            LastActive = "Yesterday"
-        });
+            RecentAccounts.Add(new AccountDisplayModel
+            {
+                Id = acc.Id,
+                Username = acc.Username,
+                DisplayName = string.IsNullOrWhiteSpace(acc.DisplayName) ? acc.Username : acc.DisplayName,
+                Tag = acc.Tag ?? "Main",
+                Notes = acc.Notes,
+                IsDefault = acc.IsDefault,
+                LastActive = acc.LastUsedAtUtc.HasValue ? acc.LastUsedAtUtc.Value.ToLocalTime().ToString("g") : "Never"
+            });
+        }
 
-        RecentAccounts.Add(new AccountDisplayModel
-        {
-            Username = "ShadowTrader_99",
-            DisplayName = "Trader",
-            Tag = "Alt",
-            IsDefault = false,
-            LastActive = "3 days ago"
-        });
-
-        SelectedAccount = RecentAccounts[0];
+        SelectedAccount = RecentAccounts.FirstOrDefault(a => a.IsDefault) ?? RecentAccounts.FirstOrDefault();
     }
 
     [RelayCommand]

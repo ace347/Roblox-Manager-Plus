@@ -35,6 +35,9 @@ public partial class App : WpfApp
         var dbInit = _serviceProvider.GetRequiredService<DatabaseInitializer>();
         await dbInit.InitializeAsync();
 
+        var mainVm = _serviceProvider.GetRequiredService<MainViewModel>();
+        await mainVm.DashboardVm.RefreshAsync();
+
         var mainWindow = _serviceProvider.GetRequiredService<MainWindow>();
         mainWindow.Show();
     }
@@ -46,10 +49,12 @@ public partial class App : WpfApp
         var dbPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RobloxAccountManager", "vault.db");
         services.AddSingleton(sp => new DatabaseInitializer(dbPath, sp.GetRequiredService<ILogger<DatabaseInitializer>>()));
 
+        services.AddSingleton<IAccountRepository, SqliteAccountRepository>();
         services.AddSingleton<IEncryptionService, DpapiEncryptionService>();
         services.AddScoped<IAccountService, AccountService>();
 
         services.AddSingleton<DashboardViewModel>();
+        services.AddSingleton<AccountsViewModel>();
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<MainWindow>();
     }

@@ -39,9 +39,11 @@ This document outlines the delivery phases, milestones, and verification criteri
 - [x] Implement MVVM commands, mock data bindings, and unit tests — `COMPLETED`
 
 ### Phase 3: SQLite Database & Account CRUD
-- [ ] SQLite connection manager & auto-migration engine — `PLANNED`
-- [ ] Repository implementations (`AccountRepository`) with parameterized queries — `PLANNED`
-- [ ] Account CRUD unit & integration tests — `PLANNED`
+- [x] SQLite connection manager, WAL mode & versioned migration engine — `COMPLETED`
+- [x] Repository implementation (`SqliteAccountRepository`) with parameterized queries — `COMPLETED`
+- [x] Application layer CRUD services with validation and duplicate prevention — `COMPLETED`
+- [x] Full UI integration: Accounts view, Add/Edit modal dialog, search, and delete — `COMPLETED`
+- [x] Automated tests for SQLite repository (CRUD, search, default swapping) — `COMPLETED`
 
 ### Phase 4: DPAPI Security & Credential Management
 - [ ] Implement `DpapiEncryptionService` with `DataProtectionScope.CurrentUser` — `PLANNED`

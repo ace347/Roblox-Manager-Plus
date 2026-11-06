@@ -62,7 +62,32 @@
         <!-- Main Content Area -->
         <Grid Grid.Column="1" Margin="28,24,28,24">
             <!-- Dashboard View -->
-            <views:DashboardView DataContext="{Binding DashboardVm}"/>
+            <views:DashboardView DataContext="{Binding DashboardVm}">
+                <views:DashboardView.Style>
+                    <Style TargetType="views:DashboardView">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding CurrentPage}" Value="Dashboard">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </views:DashboardView.Style>
+            </views:DashboardView>
+
+            <!-- Accounts View -->
+            <views:AccountsView DataContext="{Binding AccountsVm}">
+                <views:AccountsView.Style>
+                    <Style TargetType="views:AccountsView">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding CurrentPage}" Value="Accounts">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </views:AccountsView.Style>
+            </views:AccountsView>
         </Grid>
     </Grid>
 </Window>

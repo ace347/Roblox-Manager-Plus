@@ -23,17 +23,29 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private DashboardViewModel _dashboardVm;
 
-    public MainViewModel(DashboardViewModel dashboardVm)
+    [ObservableProperty]
+    private AccountsViewModel _accountsVm;
+
+    public MainViewModel(DashboardViewModel dashboardVm, AccountsViewModel accountsVm)
     {
         _dashboardVm = dashboardVm;
+        _accountsVm = accountsVm;
     }
 
     [RelayCommand]
-    private void Navigate(string page)
+    private async Task NavigateAsync(string page)
     {
         if (Enum.TryParse<NavigationPage>(page, true, out var navPage))
         {
             CurrentPage = navPage;
+            if (navPage == NavigationPage.Dashboard)
+            {
+                await DashboardVm.RefreshAsync();
+            }
+            else if (navPage == NavigationPage.Accounts)
+            {
+                await AccountsVm.LoadAccountsAsync();
+            }
         }
     }
 }
