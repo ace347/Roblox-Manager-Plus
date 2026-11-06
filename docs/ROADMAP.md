@@ -25,9 +25,12 @@ This document outlines the delivery phases, milestones, and verification criteri
 - [x] Architecture Decision Records (ADRs) initialized — `COMPLETED`
 
 ### Phase 1: Solution & Project Scaffolding
-- [ ] Create `.sln` and `.csproj` files for all Core, App, Infra, and Test modules — `PLANNED`
-- [ ] Configure nullable checks, warnings, and code analysis — `PLANNED`
-- [ ] Verify clean baseline build and passing test runner — `PLANNED`
+- [x] Create `.slnx` and `.csproj` files for all Core, App, Infra, and Test modules — `COMPLETED`
+- [x] Configure Central Package Management, nullable checks, and code analysis — `COMPLETED`
+- [x] Implement dependency injection registration and initial MVVM setup — `COMPLETED`
+- [x] Implement SQLite initialization infrastructure — `COMPLETED`
+- [x] Configure Serilog with redaction hooks — `COMPLETED`
+- [x] Verify clean baseline build (0 errors, 0 warnings) and all passing tests — `COMPLETED`
 
 ### Phase 2: WPF Dark-Themed Presentation Dashboard
 - [ ] Implement MainWindow and Shell navigation framework — `PLANNED`

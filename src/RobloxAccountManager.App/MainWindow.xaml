@@ -1,0 +1,16 @@
+<Window x:Class="RobloxAccountManager.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:RobloxAccountManager.App.ViewModels"
+        mc:Ignorable="d"
+        Title="{Binding Title}" Height="600" Width="900"
+        Background="#18181B" WindowStartupLocation="CenterScreen">
+    <Grid Margin="20">
+        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+            <TextBlock Text="{Binding Title}" FontSize="24" FontWeight="Bold" Foreground="#FAFAFA" HorizontalAlignment="Center"/>
+            <TextBlock Text="{Binding StatusMessage}" FontSize="14" Foreground="#A1A1AA" Margin="0,10,0,0" HorizontalAlignment="Center"/>
+        </StackPanel>
+    </Grid>
+</Window>

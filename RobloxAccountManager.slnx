@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/RobloxAccountManager.App/RobloxAccountManager.App.csproj" />
+    <Project Path="src/RobloxAccountManager.Application/RobloxAccountManager.Application.csproj" />
+    <Project Path="src/RobloxAccountManager.Core/RobloxAccountManager.Core.csproj" />
+    <Project Path="src/RobloxAccountManager.Infrastructure/RobloxAccountManager.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/RobloxAccountManager.App.Tests/RobloxAccountManager.App.Tests.csproj" />
+    <Project Path="tests/RobloxAccountManager.Application.Tests/RobloxAccountManager.Application.Tests.csproj" />
+    <Project Path="tests/RobloxAccountManager.Core.Tests/RobloxAccountManager.Core.Tests.csproj" />
+    <Project Path="tests/RobloxAccountManager.Infrastructure.Tests/RobloxAccountManager.Infrastructure.Tests.csproj" />
+  </Folder>
+</Solution>
