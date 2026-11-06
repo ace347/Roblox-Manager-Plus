@@ -38,10 +38,19 @@ public sealed class WinTrustAuthenticodeVerifier : IAuthenticodeVerifier
     private const int CRYPT_E_REVOCATION_OFFLINE = unchecked((int)0x80092013);
     private const int NTE_BAD_SIGNATURE = unchecked((int)0x80090006);
 
-    // WinTrust State Action Constants
-    private const uint WTD_STATEACTION_IGNORE = 0x00000000;
-    private const uint WTD_STATEACTION_VERIFY = 0x00000001;
-    private const uint WTD_STATEACTION_CLOSE = 0x00000002;
+    // WinTrust Revocation and State Action Constants
+    public const uint WTD_REVOKE_NONE = 0x00000000;
+    public const uint WTD_REVOKE_WHOLECHAIN = 0x00000001; // For WINTRUST_DATA.fdwRevocationChecks
+
+    public const uint WTD_REVOCATION_CHECK_NONE = 0x00000010;
+    public const uint WTD_REVOCATION_CHECK_END_CERT = 0x00000020;
+    public const uint WTD_REVOCATION_CHECK_CHAIN = 0x00000040; // For WINTRUST_DATA.dwProvFlags
+    public const uint WTD_REVOCATION_CHECK_CHAIN_EXCLUDE_ROOT = 0x00000080;
+    public const uint WTD_CACHE_ONLY_URL_RETRIEVAL = 0x00001000; // For WINTRUST_DATA.dwProvFlags
+
+    public const uint WTD_STATEACTION_IGNORE = 0x00000000;
+    public const uint WTD_STATEACTION_VERIFY = 0x00000001;
+    public const uint WTD_STATEACTION_CLOSE = 0x00000002;
 
     private readonly ILogger<WinTrustAuthenticodeVerifier> _logger;
 
@@ -222,7 +231,7 @@ public sealed class WinTrustAuthenticodeVerifier : IAuthenticodeVerifier
         trustData.pPolicyCallbackData = IntPtr.Zero;
         trustData.pSIPClientData = IntPtr.Zero;
         trustData.dwUIChoice = 2; // WTD_UI_NONE - no dialogs or prompts
-        trustData.fdwRevocationChecks = 0; // WTD_REVOKE_NONE (revocation governed by dwProvFlags)
+        trustData.fdwRevocationChecks = WTD_REVOKE_WHOLECHAIN; // 0x00000001: Revocation checking across whole chain
         trustData.dwUnionChoice = 1; // WTD_CHOICE_FILE
         trustData.pFile = pFileInfo;
         trustData.dwStateAction = WTD_STATEACTION_VERIFY; // Allocate and populate state data
@@ -231,31 +240,38 @@ public sealed class WinTrustAuthenticodeVerifier : IAuthenticodeVerifier
 
         // WTD_REVOCATION_CHECK_CHAIN (0x00000040) enforces revocation checking across chain.
         // WTD_CACHE_ONLY_URL_RETRIEVAL (0x00001000) restricts lookup to local cache avoiding network hangs.
-        trustData.dwProvFlags = 0x00000040 | 0x00001000;
+        trustData.dwProvFlags = WTD_REVOCATION_CHECK_CHAIN | WTD_CACHE_ONLY_URL_RETRIEVAL;
         trustData.dwUIContext = 0;
 
         IntPtr pTrustData = Marshal.AllocHGlobal(Marshal.SizeOf<WINTRUST_DATA>());
         Marshal.StructureToPtr(trustData, pTrustData, false);
 
-        int result;
+        int result = -1;
         try
         {
             // First call: Verify and obtain state handle
             result = WinVerifyTrust(new IntPtr(-1), ActionGenericVerifyV2, pTrustData);
-
-            // Read updated structure back to get populated hWVTStateData handle
-            trustData = Marshal.PtrToStructure<WINTRUST_DATA>(pTrustData);
-
-            // Second call: Close and release provider state data if allocated
-            if (trustData.hWVTStateData != IntPtr.Zero)
-            {
-                trustData.dwStateAction = WTD_STATEACTION_CLOSE;
-                Marshal.StructureToPtr(trustData, pTrustData, false);
-                _ = WinVerifyTrust(new IntPtr(-1), ActionGenericVerifyV2, pTrustData);
-            }
         }
         finally
         {
+            try
+            {
+                // Read updated structure back to get populated hWVTStateData handle
+                var updatedData = Marshal.PtrToStructure<WINTRUST_DATA>(pTrustData);
+
+                // Second call: Close and release provider state data if allocated
+                if (updatedData.hWVTStateData != IntPtr.Zero)
+                {
+                    updatedData.dwStateAction = WTD_STATEACTION_CLOSE;
+                    Marshal.StructureToPtr(updatedData, pTrustData, false);
+                    _ = WinVerifyTrust(new IntPtr(-1), ActionGenericVerifyV2, pTrustData);
+                }
+            }
+            catch
+            {
+                // Best effort closing; ensure memory freeing continues
+            }
+
             Marshal.FreeHGlobal(fileInfo.pcwszFilePath);
             Marshal.FreeHGlobal(pFileInfo);
             Marshal.FreeHGlobal(pTrustData);

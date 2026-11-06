@@ -166,4 +166,25 @@ public sealed class WinTrustAuthenticodeVerifierTests : IDisposable
         result.IsValid.Should().BeFalse();
         result.Status.Should().Be(AuthenticodeStatus.PublisherMismatch);
     }
+
+    // ── 6. WinTrust Constants and Field Assignment Regression Tests ────────
+
+    [Fact]
+    public void WinTrustConstants_RevocationFieldAssignments_HaveExactValues()
+    {
+        // fdwRevocationChecks must use WTD_REVOKE_WHOLECHAIN (0x00000001)
+        WinTrustAuthenticodeVerifier.WTD_REVOKE_WHOLECHAIN.Should().Be(0x00000001U);
+        WinTrustAuthenticodeVerifier.WTD_REVOKE_NONE.Should().Be(0x00000000U);
+
+        // dwProvFlags must use WTD_REVOCATION_CHECK_CHAIN (0x00000040)
+        WinTrustAuthenticodeVerifier.WTD_REVOCATION_CHECK_CHAIN.Should().Be(0x00000040U);
+
+        // dwProvFlags must use WTD_CACHE_ONLY_URL_RETRIEVAL (0x00001000)
+        WinTrustAuthenticodeVerifier.WTD_CACHE_ONLY_URL_RETRIEVAL.Should().Be(0x00001000U);
+
+        // State actions
+        WinTrustAuthenticodeVerifier.WTD_STATEACTION_IGNORE.Should().Be(0x00000000U);
+        WinTrustAuthenticodeVerifier.WTD_STATEACTION_VERIFY.Should().Be(0x00000001U);
+        WinTrustAuthenticodeVerifier.WTD_STATEACTION_CLOSE.Should().Be(0x00000002U);
+    }
 }
