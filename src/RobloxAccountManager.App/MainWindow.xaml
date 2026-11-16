@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:views="clr-namespace:RobloxAccountManager.App.Views"
+        xmlns:viewModels="clr-namespace:RobloxAccountManager.App.ViewModels"
         mc:Ignorable="d"
         Title="{Binding Title}" Height="720" Width="1100"
         MinHeight="600" MinWidth="850"
@@ -45,49 +46,38 @@
 
                 <!-- Navigation Tabs -->
                 <StackPanel>
-                    <RadioButton Content="📊  Dashboard" Style="{StaticResource NavRadioButton}" IsChecked="True" 
-                                 Command="{Binding NavigateCommand}" CommandParameter="Dashboard"/>
-                    <RadioButton Content="👥  Accounts" Style="{StaticResource NavRadioButton}" 
-                                 Command="{Binding NavigateCommand}" CommandParameter="Accounts"/>
-                    <RadioButton Content="⚡  Activity" Style="{StaticResource NavRadioButton}" 
-                                 Command="{Binding NavigateCommand}" CommandParameter="Activity"/>
-                    <RadioButton Content="🔒  Security" Style="{StaticResource NavRadioButton}" 
-                                 Command="{Binding NavigateCommand}" CommandParameter="Security"/>
-                    <RadioButton Content="⚙️  Settings" Style="{StaticResource NavRadioButton}" 
-                                 Command="{Binding NavigateCommand}" CommandParameter="Settings"/>
+                    <RadioButton x:Name="DashboardNavigation" Content="📊  Dashboard" Style="{StaticResource NavRadioButton}"
+                                 IsChecked="{Binding CurrentPage, Converter={StaticResource NavigationPageToBooleanConverter}, ConverterParameter={x:Static viewModels:NavigationPage.Dashboard}}"
+                                 GroupName="MainNavigation"
+                                 Command="{Binding NavigateCommand}" CommandParameter="{x:Static viewModels:NavigationPage.Dashboard}"/>
+                    <RadioButton x:Name="AccountsNavigation" Content="👥  Accounts" Style="{StaticResource NavRadioButton}"
+                                 IsChecked="{Binding CurrentPage, Converter={StaticResource NavigationPageToBooleanConverter}, ConverterParameter={x:Static viewModels:NavigationPage.Accounts}}"
+                                 GroupName="MainNavigation"
+                                 Command="{Binding NavigateCommand}" CommandParameter="{x:Static viewModels:NavigationPage.Accounts}"/>
+                    <RadioButton x:Name="SessionsNavigation" Content="▶  Sessions" Style="{StaticResource NavRadioButton}"
+                                 IsChecked="{Binding CurrentPage, Converter={StaticResource NavigationPageToBooleanConverter}, ConverterParameter={x:Static viewModels:NavigationPage.Sessions}}"
+                                 GroupName="MainNavigation"
+                                 Command="{Binding NavigateCommand}" CommandParameter="{x:Static viewModels:NavigationPage.Sessions}"/>
+                    <RadioButton x:Name="ActivityNavigation" Content="⚡  Activity" Style="{StaticResource NavRadioButton}"
+                                 IsChecked="{Binding CurrentPage, Converter={StaticResource NavigationPageToBooleanConverter}, ConverterParameter={x:Static viewModels:NavigationPage.Activity}}"
+                                 GroupName="MainNavigation"
+                                 Command="{Binding NavigateCommand}" CommandParameter="{x:Static viewModels:NavigationPage.Activity}"/>
+                    <RadioButton x:Name="SecurityNavigation" Content="🔒  Security" Style="{StaticResource NavRadioButton}"
+                                 IsChecked="{Binding CurrentPage, Converter={StaticResource NavigationPageToBooleanConverter}, ConverterParameter={x:Static viewModels:NavigationPage.Security}}"
+                                 GroupName="MainNavigation"
+                                 Command="{Binding NavigateCommand}" CommandParameter="{x:Static viewModels:NavigationPage.Security}"/>
+                    <RadioButton x:Name="SettingsNavigation" Content="⚙️  Settings" Style="{StaticResource NavRadioButton}"
+                                 IsChecked="{Binding CurrentPage, Converter={StaticResource NavigationPageToBooleanConverter}, ConverterParameter={x:Static viewModels:NavigationPage.Settings}}"
+                                 GroupName="MainNavigation"
+                                 Command="{Binding NavigateCommand}" CommandParameter="{x:Static viewModels:NavigationPage.Settings}"/>
                 </StackPanel>
             </DockPanel>
         </Border>
 
         <!-- Main Content Area -->
-        <Grid Grid.Column="1" Margin="28,24,28,24">
-            <!-- Dashboard View -->
-            <views:DashboardView DataContext="{Binding DashboardVm}">
-                <views:DashboardView.Style>
-                    <Style TargetType="views:DashboardView">
-                        <Setter Property="Visibility" Value="Collapsed"/>
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding CurrentPage}" Value="Dashboard">
-                                <Setter Property="Visibility" Value="Visible"/>
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </views:DashboardView.Style>
-            </views:DashboardView>
-
-            <!-- Accounts View -->
-            <views:AccountsView DataContext="{Binding AccountsVm}">
-                <views:AccountsView.Style>
-                    <Style TargetType="views:AccountsView">
-                        <Setter Property="Visibility" Value="Collapsed"/>
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding CurrentPage}" Value="Accounts">
-                                <Setter Property="Visibility" Value="Visible"/>
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </views:AccountsView.Style>
-            </views:AccountsView>
-        </Grid>
+        <ContentControl x:Name="MainContentHost"
+                        Grid.Column="1"
+                        Margin="28,24,28,24"
+                        Content="{Binding CurrentPageViewModel}"/>
     </Grid>
 </Window>

@@ -23,9 +23,8 @@ graph TD
 - **Rule:** ViewModels never touch SQLite or call raw cryptographic routines directly.
 
 ### 2.2 Application Layer (`RobloxAccountManager.Application`)
-- Coordinates business workflows: `AddAccountUseCase`, `SwitchAccountUseCase`, `RefreshAvatarUseCase`.
-- Encapsulates input validation rules.
-- Dispatches domain events and manages asynchronous orchestrations.
+- Currently contains `AccountService`, which validates and coordinates account metadata CRUD with `IAccountRepository`.
+- There is no account-switching, avatar-fetching, credential-handoff, or event-dispatch workflow implemented.
 
 ### 2.3 Core Domain (`RobloxAccountManager.Core`)
 - Contains enterprise business models (`Account`, `Profile`, `LaunchConfiguration`).
@@ -35,8 +34,8 @@ graph TD
 ### 2.4 Infrastructure (`RobloxAccountManager.Infrastructure`)
 - **Database:** SQLite access utilizing parameterized commands via `Microsoft.Data.Sqlite`.
 - **Security:** `DpapiEncryptionService` implementing Windows DPAPI with `DataProtectionScope.CurrentUser`.
-- **Process Management:** `RobloxProcessLauncher` launching standard client paths via explicit parameter arrays, avoiding raw shell executions.
-- **Logging:** Serilog logger configured with masking sinks for sensitive fields.
+- **Process Management:** `RobloxProcessLauncher` rechecks Authenticode trust and uses `ProcessStartInfo.ArgumentList` with shell execution disabled.
+- **Logging:** Serilog writes local rolling files; a configured enricher redacts matching patterns in top-level structured string properties only.
 
 ---
 
@@ -46,24 +45,21 @@ graph TD
 sequenceDiagram
     participant User
     participant ViewModel
-    participant AccountService
-    participant DPAPI
     participant SQLite
+    participant RobloxClientLocator
+    participant WinTrust
     participant Launcher
 
-    User->>ViewModel: Select Account & Click Launch
-    ViewModel->>AccountService: LaunchAccountAsync(accountId)
-    AccountService->>SQLite: QueryEncryptedCredentials(accountId)
-    SQLite-->>AccountService: EncryptedBlob
-    AccountService->>DPAPI: Decrypt(EncryptedBlob)
-    DPAPI-->>AccountService: DecryptedCredentials
-    AccountService->>Launcher: PrepareLaunch(DecryptedCredentials)
-    Launcher->>Launcher: Launch Roblox Process Safely
-    AccountService->>AccountService: Wipe Credentials from Memory
-    AccountService-->>ViewModel: LaunchSuccess
+    User->>ViewModel: Add, edit, search, or delete metadata
+    ViewModel->>AccountService: Account metadata operation
+    AccountService->>SQLite: Parameterized repository operation
+    SQLite-->>AccountService: Account metadata
+    AccountService-->>ViewModel: Operation result
 ```
 
-1. Credentials remain encrypted in the SQLite database file at all times.
-2. Credentials are only decrypted into memory immediately prior to handoff.
-3. Once the handoff completes, in-memory credential buffers are cleared.
+`IRobloxLauncher` and its infrastructure implementation are registered, but no current UI command invokes them. Direct launch behavior is covered by infrastructure tests only.
+
+1. The account UI stores metadata only; account creation initializes an empty encrypted-secret blob.
+2. The independent vault API uses DPAPI `CurrentUser` protection when explicitly called by a caller.
+3. Roblox launching currently does not use the vault or inject authentication data.
 

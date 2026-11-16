@@ -118,6 +118,9 @@ public sealed class RobloxClientLocator
         return preferred;
     }
 
+    public AuthenticodeResult VerifyExecutable(string executablePath) =>
+        _authenticodeVerifier.VerifyFile(executablePath, ExpectedPublishers);
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private RobloxInstallation? BuildInstallation(string exePath, string versionDir)
@@ -146,7 +149,7 @@ public sealed class RobloxClientLocator
         var version = Path.GetFileName(versionDir); // e.g. "version-abc123"
 
         // Cryptographic Authenticode & WinVerifyTrust evaluation
-        var verifyResult = _authenticodeVerifier.VerifyFile(exePath, ExpectedPublishers);
+        var verifyResult = VerifyExecutable(exePath);
         var signatureVerified = verifyResult.IsValid;
 
         if (!signatureVerified)
@@ -154,6 +157,7 @@ public sealed class RobloxClientLocator
             _logger.LogWarning(
                 "Authenticode verification failed for {Path}: {Status} ({Message}, HRESULT: 0x{HResult:X8})",
                 exePath, verifyResult.Status, verifyResult.Message, verifyResult.RawHResult);
+            return null;
         }
 
         return new RobloxInstallation

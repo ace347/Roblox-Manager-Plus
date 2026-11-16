@@ -77,6 +77,7 @@ public partial class AccountsViewModel : ObservableObject
         {
             IsLoading = true;
             ErrorMessage = null;
+            IsEmpty = false;
             Accounts.Clear();
 
             var tagFilter = SelectedTag == "All" ? null : SelectedTag;
@@ -102,9 +103,9 @@ public partial class AccountsViewModel : ObservableObject
                 SelectedAccount = Accounts[0];
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            ErrorMessage = $"Failed to load accounts: {ex.Message}";
+            ErrorMessage = "Unable to load accounts from the local database.";
         }
         finally
         {
@@ -182,9 +183,17 @@ public partial class AccountsViewModel : ObservableObject
             IsDialogOpen = false;
             await LoadAccountsAsync();
         }
-        catch (Exception ex)
+        catch (InvalidOperationException ex)
         {
             ErrorMessage = ex.Message;
+        }
+        catch (ArgumentException ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        catch (Exception)
+        {
+            ErrorMessage = "Unable to save this account. Please try again.";
         }
     }
 
@@ -198,9 +207,9 @@ public partial class AccountsViewModel : ObservableObject
             await _accountService.DeleteAccountAsync(account.Id);
             await LoadAccountsAsync();
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            ErrorMessage = $"Failed to delete account: {ex.Message}";
+            ErrorMessage = "Unable to delete this account. Please try again.";
         }
     }
 
@@ -214,9 +223,9 @@ public partial class AccountsViewModel : ObservableObject
             await _accountService.SetDefaultAccountAsync(account.Id);
             await LoadAccountsAsync();
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            ErrorMessage = $"Failed to set default account: {ex.Message}";
+            ErrorMessage = "Unable to update the default account. Please try again.";
         }
     }
 }

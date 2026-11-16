@@ -1,5 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using RobloxAccountManager.Core.Exceptions;
+using RobloxAccountManager.Core.Interfaces;
 using RobloxAccountManager.Core.Models;
 using RobloxAccountManager.Infrastructure.Database;
 using Xunit;
@@ -59,6 +61,157 @@ public class SqliteAccountRepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task InitializeAsync_EnablesWalAndForeignKeysOnConnections()
+    {
+        using var connection = _initializer.CreateConnection();
+        await connection.OpenAsync();
+
+        using var journalModeCommand = connection.CreateCommand();
+        journalModeCommand.CommandText = "PRAGMA journal_mode;";
+        var journalMode = await journalModeCommand.ExecuteScalarAsync();
+
+        using var foreignKeysCommand = connection.CreateCommand();
+        foreignKeysCommand.CommandText = "PRAGMA foreign_keys;";
+        var foreignKeys = await foreignKeysCommand.ExecuteScalarAsync();
+
+        journalMode.Should().Be("wal");
+        foreignKeys.Should().Be(1L);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_AppliesSessionHistoryMigration()
+    {
+        using var connection = _initializer.CreateConnection();
+        await connection.OpenAsync();
+
+        using var versionCommand = connection.CreateCommand();
+        versionCommand.CommandText = "SELECT MAX(Version) FROM SchemaMigrations;";
+        var version = await versionCommand.ExecuteScalarAsync();
+
+        using var tableCommand = connection.CreateCommand();
+        tableCommand.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'ClientSessions';";
+        var sessionTableCount = await tableCommand.ExecuteScalarAsync();
+
+        version.Should().Be(2L);
+        sessionTableCount.Should().Be(1L);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_RejectsFutureSchemaWithoutChangingExistingData()
+    {
+        using (var connection = new Microsoft.Data.Sqlite.SqliteConnection(
+                   new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder { DataSource = _testDbPath }.ConnectionString))
+        {
+            await connection.OpenAsync();
+            using var command = connection.CreateCommand();
+            command.CommandText = @"
+                DELETE FROM SchemaMigrations;
+                INSERT INTO SchemaMigrations (Version, AppliedAtUtc) VALUES (99, 'future');
+                CREATE TABLE PreserveMe (Value TEXT NOT NULL);
+                INSERT INTO PreserveMe (Value) VALUES ('keep');
+            ";
+            await command.ExecuteNonQueryAsync();
+        }
+
+        var act = () => _initializer.InitializeAsync();
+
+        await act.Should().ThrowAsync<NotSupportedException>();
+
+        using var verificationConnection = _initializer.CreateConnection();
+        await verificationConnection.OpenAsync();
+        using var verifyCommand = verificationConnection.CreateCommand();
+        verifyCommand.CommandText = "SELECT Value FROM PreserveMe;";
+        (await verifyCommand.ExecuteScalarAsync()).Should().Be("keep");
+    }
+
+    [Fact]
+    public async Task InitializeAsync_FailedSessionMigrationRollsBackVersionRecord()
+    {
+        using (var connection = new Microsoft.Data.Sqlite.SqliteConnection(
+                   new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder { DataSource = _testDbPath }.ConnectionString))
+        {
+            await connection.OpenAsync();
+            using var command = connection.CreateCommand();
+            command.CommandText = @"
+                DELETE FROM SchemaMigrations WHERE Version = 2;
+                DROP TABLE ClientSessions;
+                CREATE TABLE ClientSessions (UnexpectedColumn TEXT NOT NULL);
+            ";
+            await command.ExecuteNonQueryAsync();
+        }
+
+        var act = () => _initializer.InitializeAsync();
+
+        await act.Should().ThrowAsync<Microsoft.Data.Sqlite.SqliteException>();
+
+        using var verificationConnection = _initializer.CreateConnection();
+        await verificationConnection.OpenAsync();
+        using var verifyCommand = verificationConnection.CreateCommand();
+        verifyCommand.CommandText = "SELECT COUNT(*) FROM SchemaMigrations WHERE Version = 2;";
+        (await verifyCommand.ExecuteScalarAsync()).Should().Be(0L);
+    }
+
+    [Fact]
+    public async Task ClientSessionRepository_PersistsLaunchAssociationAndProcessMetadata()
+    {
+        var sessionRepository = new SqliteClientSessionRepository(_initializer);
+        var session = new ClientSession
+        {
+            AccountId = Guid.NewGuid(),
+            AccountUsername = "SavedProfile",
+            AccountDisplayName = "Profile Display",
+            ProcessId = 4321,
+            ProcessStartedAtUtc = DateTime.UtcNow,
+            ExecutablePath = @"C:\Roblox\RobloxPlayerBeta.exe",
+            Status = ClientSessionStatus.Running
+        };
+
+        await sessionRepository.AddAsync(session);
+
+        var persisted = await sessionRepository.GetAllAsync();
+        persisted.Should().ContainSingle();
+        persisted[0].Id.Should().Be(session.Id);
+        persisted[0].AccountId.Should().Be(session.AccountId);
+        persisted[0].AccountUsername.Should().Be("SavedProfile");
+        persisted[0].ProcessId.Should().Be(4321);
+        persisted[0].ExecutablePath.Should().Be(session.ExecutablePath);
+        persisted[0].Status.Should().Be(ClientSessionStatus.Running);
+        persisted[0].AuthenticationStatus.Should().Contain("Unverified");
+    }
+
+    [Fact]
+    public async Task ClientSessionRepository_EnforcesOnlyOneActiveManagedSession()
+    {
+        var sessionRepository = new SqliteClientSessionRepository(_initializer);
+        var first = new ClientSession
+        {
+            AccountId = Guid.NewGuid(),
+            AccountUsername = "FirstProfile",
+            ExecutablePath = @"C:\Roblox\RobloxPlayerBeta.exe",
+            Status = ClientSessionStatus.Launching
+        };
+        await sessionRepository.AddAsync(first);
+
+        var second = new ClientSession
+        {
+            AccountId = Guid.NewGuid(),
+            AccountUsername = "SecondProfile",
+            ExecutablePath = @"C:\Roblox\RobloxPlayerBeta.exe",
+            Status = ClientSessionStatus.Launching
+        };
+
+        var act = () => sessionRepository.AddAsync(second);
+
+        await act.Should().ThrowAsync<ClientSessionConflictException>();
+        first.Status = ClientSessionStatus.Exited;
+        first.EndedAtUtc = DateTime.UtcNow;
+        await sessionRepository.UpdateAsync(first);
+        await sessionRepository.AddAsync(second);
+
+        (await sessionRepository.GetAllAsync()).Should().HaveCount(2);
+    }
+
+    [Fact]
     public async Task UpdateAsync_ModifiesExistingAccountFields()
     {
         var account = new Account
@@ -106,6 +259,18 @@ public class SqliteAccountRepositoryTests : IDisposable
         var resultsFilteredByTag = await _repository.SearchAsync("Shadow", "Alt");
         resultsFilteredByTag.Should().HaveCount(1);
         resultsFilteredByTag[0].Username.Should().Be("ShadowMage");
+    }
+
+    [Fact]
+    public async Task AddAsync_ConcurrentTemporaryDatabaseWritesPersistAllAccounts()
+    {
+        var accounts = Enumerable.Range(0, 12)
+            .Select(index => new Account { Username = $"ConcurrentUser{index}" })
+            .ToArray();
+
+        await Task.WhenAll(accounts.Select(account => _repository.AddAsync(account)));
+
+        (await _repository.GetAllAsync()).Should().HaveCount(accounts.Length);
     }
 
     [Fact]

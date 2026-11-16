@@ -11,11 +11,15 @@ public sealed class LaunchResult
     /// <summary>The OS process ID of the launched client, or null if launch failed.</summary>
     public int? ProcessId { get; init; }
 
+    /// <summary>The start time captured from the process handle, or null if the OS denied inspection.</summary>
+    public DateTime? ProcessStartedAtUtc { get; init; }
+
     /// <summary>Human-readable description of a failure reason, or null on success.</summary>
     public string? FailureReason { get; init; }
 
     /// <summary>Creates a successful launch result.</summary>
-    public static LaunchResult Succeeded(int pid) => new() { Success = true, ProcessId = pid };
+    public static LaunchResult Succeeded(int pid, DateTime? processStartedAtUtc = null) =>
+        new() { Success = true, ProcessId = pid, ProcessStartedAtUtc = processStartedAtUtc };
 
     /// <summary>Creates a failed launch result.</summary>
     public static LaunchResult Failed(string reason) => new() { Success = false, FailureReason = reason };

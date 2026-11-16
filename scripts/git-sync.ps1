@@ -17,6 +17,10 @@ if (-not $remoteUrl) {
 # Fetch safely
 Write-Host "Fetching remote changes..." -ForegroundColor Yellow
 git fetch $Remote
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Fetch failed. Local and remote state were not synchronized."
+    exit 1
+}
 
 # Check if there are local uncommitted changes
 $uncommitted = git status --porcelain

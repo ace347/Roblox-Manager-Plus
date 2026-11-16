@@ -29,6 +29,23 @@ public class AccountsViewModelTests
     }
 
     [Fact]
+    public async Task LoadAccountsAsync_WhenServiceFails_ShowsSanitizedErrorAndClearsLoading()
+    {
+        var mockService = new Mock<IAccountService>();
+        mockService.Setup(service => service.SearchAccountsAsync(
+                It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("private database path"));
+        var vm = new AccountsViewModel(mockService.Object);
+
+        await vm.LoadAccountsAsync();
+
+        vm.ErrorMessage.Should().NotBeNullOrWhiteSpace();
+        vm.ErrorMessage.Should().NotContain("private database path");
+        vm.IsLoading.Should().BeFalse();
+        vm.IsEmpty.Should().BeFalse();
+    }
+
+    [Fact]
     public void OpenAddDialog_ResetsFieldsAndSetsDialogOpen()
     {
         var mockService = new Mock<IAccountService>();

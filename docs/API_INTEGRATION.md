@@ -8,9 +8,9 @@ This document defines how Secure Roblox Account Manager interacts with Roblox en
 
 ## 2. Public API Usage
 
-The application uses official, unauthenticated public endpoints solely for displaying user identity elements (e.g., avatar thumbnails):
+No HTTP/API integration is currently implemented in application source. The endpoint below is a potential future integration only; there are no avatar requests, caches, or background network calls at present.
 
-### Avatar Thumbnail Retrieval
+### Proposed Avatar Thumbnail Retrieval
 - **Endpoint:** `https://thumbnails.roblox.com/v1/users/avatar-headshot`
 - **Method:** `GET`
 - **Parameters:**
@@ -18,11 +18,23 @@ The application uses official, unauthenticated public endpoints solely for displ
   - `size`: `150x150`
   - `format`: `Png`
   - `isCircular`: `true`
-- **Cache Strategy:** Thumbnails are cached in `%LOCALAPPDATA%\SecureRobloxAccountManager\cache\avatars\` with an expiration of 7 days to avoid repeated network traffic.
+- **Proposed Cache Strategy:** If implemented later, thumbnails could be cached locally with an expiration policy.
 
 ---
 
-## 3. Desktop Client Launching
+## 3. Official OAuth 2.0 and Player Authentication
+
+Roblox documents Authorization Code OAuth 2.0 with PKCE and OpenID Connect for authorized Open Cloud applications. The `openid` and `profile` scopes can verify a Roblox identity to the registered app and retrieve profile claims. Open Cloud access tokens authorize the granted Open Cloud resources; an ID token is an identity assertion to the app.
+
+This flow does **not** authenticate `RobloxPlayerBeta.exe`, select the account signed into the local Player, or expose the Player's current sign-in state. The desktop client does not integrate with OAuth in this application. RAM Plus currently has no registered OAuth app/client ID, redirect registration, or reviewed scope, so it does not initiate OAuth or store OAuth tokens.
+
+Official references:
+- [OAuth 2.0 overview](https://create.roblox.com/docs/cloud/auth/oauth2-overview)
+- [OAuth 2.0 authentication reference](https://create.roblox.com/docs/cloud/auth/oauth2-reference)
+- [OAuth 2.0 app registration](https://create.roblox.com/docs/cloud/auth/oauth2-registration)
+- [Creator Third-Party App Policy](https://en.help.roblox.com/hc/en-us/articles/37924211313044-Creator-Third-Party-App-Policy)
+
+## 4. Desktop Client Launching
 
 The application launches the official desktop client installed on the local system:
 
@@ -32,9 +44,7 @@ The application launches the official desktop client installed on the local syst
   - Machine install (x64): `%PROGRAMFILES%\Roblox\Versions\version-*\RobloxPlayerBeta.exe`
 - **Preferred Installation:** Newest `LastWriteTime` among valid candidates.
 - **Minimum File Size:** 65 536 bytes — files below this threshold are rejected as suspicious stubs.
-- **Authenticode Verification:** Publisher subject checked for "Roblox Corporation" via `X509Certificate.CreateFromSignedFile` (the only .NET API that supports Authenticode PE files; `SYSLIB0057` suppressed with targeted `#pragma`).
-  - Verification failure does **not** block launch — it is logged as a warning.
-  - This protects against accidentally launching impostor executables placed in the same directory.
+- **Authenticode Verification:** Windows `WinVerifyTrust` checks the signature, trust chain, revocation status according to the local cache policy, and exact publisher identity. Discovery excludes failures; launch repeats verification immediately before process start and fails closed.
 - **Execution Mechanism:**
   - `System.Diagnostics.Process` with `UseShellExecute = false`.
   - Arguments passed via `ProcessStartInfo.ArgumentList` (no shell string concatenation).
@@ -49,5 +59,8 @@ The application launches the official desktop client installed on the local syst
   - This application does **not** implement or bypass Roblox's authentication flow.
 
 ### Known Limitation
-Roblox does not publish an official documented API for third-party applications to pass session tokens at launch time. This application intentionally leaves that capability unimplemented to remain within documented, sanctioned boundaries. Users must be signed in through the official Roblox client.
+No official API for passing Player session credentials or querying the Player's authenticated account was found in the reviewed documentation. Users must sign in manually in the official client; the manager labels authentication **unverified**.
+
+### Multiple Player Instances
+The reviewed official Roblox OAuth, Open Cloud, and third-party app documentation does not document a supported mechanism for launching multiple independent authenticated Roblox Player instances. This manager therefore restricts itself to one managed Player process and blocks a launch if any Roblox Player process is already running. It does not alter mutexes, client binaries, anti-cheat, or integrity checks. Two independent authenticated instances were not experimentally launched; multi-instance support is not claimed.
 

@@ -2,7 +2,7 @@
 
 ## 1. Test Pyramid
 
-Our testing framework ensures defensive security, data integrity, and UI stability:
+Automated tests cover domain behavior, metadata CRUD, DPAPI, SQLite, logging redaction, and controlled Windows executable verification/launch behavior. They do not prove complete application security or UI usability.
 
 - **Unit Tests:** Fast, isolated tests for domain models, validation, and encryption utilities.
 - **Integration Tests:** SQLite repository persistence, migration validation, and DPAPI roundtrip testing.
@@ -12,28 +12,34 @@ Our testing framework ensures defensive security, data integrity, and UI stabili
 
 ## 2. Test Projects
 
-- `tests/Core.Tests`: Validation of models, validation logic, and interfaces.
-- `tests/Application.Tests`: Use case coordinators, account switching logic, and event dispatchers.
-- `tests/Infrastructure.Tests`: SQLite database queries, DPAPI protection tests, and process launcher unit tests.
-- `tests/App.Tests`: ViewModel interaction tests.
+- `tests/RobloxAccountManager.Core.Tests`: Account model defaults and `SensitiveBuffer` zeroing/disposal.
+- `tests/RobloxAccountManager.Application.Tests`: Account metadata creation, empty username rejection, and duplicate rejection.
+- `tests/RobloxAccountManager.Infrastructure.Tests`: SQLite repository setup, DPAPI and `CredentialVault`, log redaction, WinTrust, client discovery, and process launcher checks.
+- `tests/RobloxAccountManager.App.Tests`: Account and dashboard ViewModel state, navigation, and add-dialog initialization.
 
 ---
 
-## 3. Cryptography & Security Testing Matrix
+## 3. Verified Run
+
+The Phase 6 and UI Release run completed on Windows with **63 passed, 0 failed, 0 skipped** (Core 2, Application 3, Infrastructure 48, App 10). The Release build also succeeded with zero warnings and errors. The prior 53-test count was a user-provided baseline; it was not independently rerun before edits. Ten automated tests were added across the Phase 6 and UI hardening work.
+
+WinTrust integration tests use signed Windows system binaries and require a fixture; they now fail rather than silently pass if no fixture is available. The process-launch test uses a temporary copy of a Windows system executable and does not use a Roblox executable or credentials.
+
+## 4. Automated Coverage and Gaps
 
 | Test Case | Method | Expected Result |
 |---|---|---|
-| **DPAPI Roundtrip** | Encrypt plain text -> Decrypt output | Plaintext matches original exactly. |
-| **Entropy Verification** | Decrypt with invalid entropy | CryptographicException thrown; no secret revealed. |
-| **Tampered Ciphertext** | Flip random bits in encrypted blob | CryptographicException thrown; fails safely. |
-| **SQL Injection Check** | Inject SQL injection strings into usernames | Stored safely via parameters; no SQL execution error. |
-| **Authenticode: Valid Binary** | Test genuine Windows signed executable | `WinVerifyTrust` succeeds (`S_OK`), status `Valid`. |
-| **Authenticode: Unsigned Binary** | Test non-signed file stub | Rejects with `NotSigned` (`0x800B0100`). |
-| **Authenticode: Tampered Binary** | Corrupt bytes of signed binary | Rejects with `CorruptedOrModified` (`0x80096010`). |
-| **Authenticode: Publisher Mismatch** | Valid Microsoft binary matched against "Roblox" | Signature valid, rejects with `PublisherMismatch`. |
-| **Authenticode: Substring Spoofing** | Reject partial or spoofed CN (e.g. "Windows" vs "Microsoft Windows") | Exact CN check rejects partial string with `PublisherMismatch`. |
-| **Authenticode: Missing File** | Test non-existent path | Fails safely with `FileNotFound`. |
+| **DPAPI** | Roundtrip, empty data, wrong entropy, corrupted ciphertext, 1 MB payload | Roundtrip succeeds; invalid inputs fail or preserve the documented empty behavior. |
+| **Credential vault** | Store/retrieve and clear using a temporary SQLite database | DB stores ciphertext; clear removes the logical secret value. |
+| **SQLite** | CRUD, search, default account, WAL, foreign-key connection flag | Parameterized operations succeed on isolated temp databases. |
+| **Sensitive buffer** | Retain underlying array across disposal | Array is zeroed and subsequent access throws. |
+| **Log redaction** | Structured scalar string containing a token pattern | Matching text is replaced before sink output. Nested and exception values are not comprehensively tested. |
+| **WinTrust** | Signed Windows fixture, unsigned file, modified signed file, publisher mismatch, expected publisher, missing file | Statuses match expected Windows trust results. Does not test an actual Roblox-signed binary. |
+| **Launcher** | Invalid signature, URL rejection, path validation, controlled launch | Invalid trust result is rejected; controlled fixture is launched without shell arguments. |
 
-### 4. Controlled Testing Limitations
-- **Revoked / Expired Real Certificates:** Generating binaries signed with certificates that are simultaneously timestamped, chained to a public CA, and revoked or expired requires live test infrastructure or mutating system certificate stores. Automated integration tests cover genuine Windows system binaries, uncorrupted signatures, tampered digests, and publisher mismatch. Expired, revoked, and explicitly distrusted statuses are tested via status code mapping and system trust provider unit contracts.
+Not currently automated: cross-Windows-user DPAPI isolation; CredentialVault repository/encryption failure combinations; database corruption recovery, failed migrations, and concurrent stress; application startup/shutdown and unavailable-database UX; real Roblox publisher/signature checks; certificate revocation freshness; process launch failure under OS policy; WPF accessibility, high-DPI, resizing, and keyboard navigation; startup/rendering/search timing and memory/idle CPU benchmarks.
+
+## 5. Manual Windows Verification
+
+The above gaps require a separate disposable Windows profile and temporary test data before claiming full Phase 6 completion. Do not point tests at a user's normal vault or use real Roblox credentials. No actual Roblox client launch was performed as part of this audit.
 

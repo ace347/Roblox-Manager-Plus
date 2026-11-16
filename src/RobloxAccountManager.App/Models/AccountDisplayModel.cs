@@ -8,6 +8,7 @@ public sealed class AccountDisplayModel
     public string Tag { get; set; } = "Main";
     public string? Notes { get; set; }
     public bool IsDefault { get; set; }
+    public string AuthenticationStatus { get; init; } = "Sign-in status not verified";
     public string LastActive { get; set; } = "Never";
     public string AvatarPlaceholder { get; init; } = "👤";
 }

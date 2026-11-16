@@ -170,6 +170,38 @@ public sealed class RobloxProcessLauncherTests : IDisposable
     }
 
     [Fact]
+    public async Task LaunchAsync_InvalidSignature_ReturnsFailedWithoutStartingProcess()
+    {
+        var exePath = Path.Combine(_tempDir, "RobloxPlayerBeta.exe");
+        File.WriteAllBytes(exePath, new byte[70_000]);
+        _mockVerifier
+            .Setup(v => v.VerifyFile(exePath, It.IsAny<IEnumerable<string>>()))
+            .Returns(AuthenticodeResult.Failure(AuthenticodeStatus.NotSigned, 0, "Unsigned test executable."));
+
+        var launcher = new RobloxProcessLauncher(CreateLocator(), NullLogger<RobloxProcessLauncher>.Instance);
+        var installation = new RobloxInstallation
+        {
+            ExecutablePath = exePath,
+            Version = "version-test",
+            IsSignatureVerified = true
+        };
+
+        var result = await launcher.LaunchAsync(installation);
+
+        result.Success.Should().BeFalse();
+        result.FailureReason.Should().Contain("signature verification failed");
+        _mockVerifier.Verify(v => v.VerifyFile(exePath, It.IsAny<IEnumerable<string>>()), Times.Once);
+    }
+
+    [Fact]
+    public void ValidateExecutablePath_TraversalSegment_ReturnsError()
+    {
+        var path = Path.Combine(_tempDir, "..", "RobloxPlayerBeta.exe");
+
+        RobloxProcessLauncher.ValidateExecutablePath(path).Should().Contain("traversal");
+    }
+
+    [Fact]
     public async Task LaunchAsync_NullInstallation_ThrowsArgumentNull()
     {
         var locator = CreateLocator();

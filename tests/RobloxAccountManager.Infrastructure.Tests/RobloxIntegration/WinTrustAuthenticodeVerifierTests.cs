@@ -46,6 +46,13 @@ public sealed class WinTrustAuthenticodeVerifierTests : IDisposable
         return null;
     }
 
+    private static string GetRequiredSystemSignedExe()
+    {
+        var systemExe = GetValidSystemSignedExe();
+        systemExe.Should().NotBeNull("Windows integration tests require a signed system executable");
+        return systemExe!;
+    }
+
     // ── 1. Missing Executable ──────────────────────────────────────────────
 
     [Fact]
@@ -91,8 +98,7 @@ public sealed class WinTrustAuthenticodeVerifierTests : IDisposable
     [Fact]
     public void VerifyFile_TamperedSignedBinary_ReturnsCorruptedOrModified()
     {
-        var systemExe = GetValidSystemSignedExe();
-        if (systemExe is null) return;
+        var systemExe = GetRequiredSystemSignedExe();
 
         var tamperedPath = Path.Combine(_tempDir, "Tampered.exe");
         var bytes = File.ReadAllBytes(systemExe);
@@ -113,8 +119,7 @@ public sealed class WinTrustAuthenticodeVerifierTests : IDisposable
     [Fact]
     public void VerifyFile_ValidSignedWindowsBinary_ReturnsValid()
     {
-        var systemExe = GetValidSystemSignedExe();
-        if (systemExe is null) return;
+        var systemExe = GetRequiredSystemSignedExe();
 
         var result = _verifier.VerifyFile(systemExe);
 
@@ -129,8 +134,7 @@ public sealed class WinTrustAuthenticodeVerifierTests : IDisposable
     [Fact]
     public void VerifyFile_ExpectedPublisherMatched_ReturnsValid()
     {
-        var systemExe = GetValidSystemSignedExe();
-        if (systemExe is null) return;
+        var systemExe = GetRequiredSystemSignedExe();
 
         var result = _verifier.VerifyFile(systemExe, ["Microsoft Windows", "Microsoft Corporation"]);
 
@@ -141,8 +145,7 @@ public sealed class WinTrustAuthenticodeVerifierTests : IDisposable
     [Fact]
     public void VerifyFile_PublisherMismatch_ReturnsPublisherMismatch()
     {
-        var systemExe = GetValidSystemSignedExe();
-        if (systemExe is null) return;
+        var systemExe = GetRequiredSystemSignedExe();
 
         // Expect Roblox Corporation on a Microsoft binary -> must fail with PublisherMismatch
         var result = _verifier.VerifyFile(systemExe, ["Roblox Corporation"]);

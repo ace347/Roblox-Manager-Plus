@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.ComponentModel;
 using Microsoft.Extensions.Logging;
 using RobloxAccountManager.Core.Interfaces;
 using RobloxAccountManager.Core.Models;
@@ -91,8 +92,19 @@ public sealed class RobloxProcessLauncher : IRobloxLauncher
 
         try
         {
+            var verification = await Task.Run(
+                () => _locator.VerifyExecutable(installation.ExecutablePath),
+                cancellationToken).ConfigureAwait(false);
+            if (!verification.IsValid)
+            {
+                _logger.LogWarning(
+                    "Refusing to launch executable with invalid Authenticode signature: {Path} ({Status})",
+                    installation.ExecutablePath, verification.Status);
+                return LaunchResult.Failed($"Executable signature verification failed: {verification.Status}.");
+            }
+
             // Offload to a thread pool thread to avoid blocking the UI thread on Process.Start().
-            var process = await Task.Run(() =>
+            using var process = await Task.Run(() =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 return Process.Start(psi);
@@ -104,10 +116,23 @@ public sealed class RobloxProcessLauncher : IRobloxLauncher
                 return LaunchResult.Failed("Process.Start returned null — the OS did not create a process.");
             }
 
-            _logger.LogInformation(
-                "Roblox client launched successfully. PID: {Pid}", process.Id);
+            var processId = process.Id;
+            DateTime? processStartedAtUtc;
+            try
+            {
+                processStartedAtUtc = process.StartTime.ToUniversalTime();
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
+            {
+                _logger.LogWarning(
+                    "Roblox client started, but its process start time could not be verified. PID: {Pid} ({ExceptionType})",
+                    processId, ex.GetType().Name);
+                processStartedAtUtc = null;
+            }
 
-            return LaunchResult.Succeeded(process.Id);
+            _logger.LogInformation("Roblox client launched. PID: {Pid}", processId);
+
+            return LaunchResult.Succeeded(processId, processStartedAtUtc);
         }
         catch (OperationCanceledException)
         {
@@ -136,15 +161,12 @@ public sealed class RobloxProcessLauncher : IRobloxLauncher
         if (!Path.IsPathFullyQualified(path))
             return "Executable path must be absolute (fully qualified).";
 
-        // Normalise and reject path traversal.
+        // Reject traversal segments before normalizing the path.
+        var pathSegments = path.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        if (pathSegments.Any(segment => segment == ".."))
+            return "Executable path contains path traversal segments.";
+
         var fullPath = Path.GetFullPath(path);
-        if (!string.Equals(fullPath, path, StringComparison.OrdinalIgnoreCase))
-        {
-            // Allow normalisation differences (trailing slash, mixed separators).
-            // But if the final path differs enough to suggest traversal, reject.
-            if (fullPath.Contains("..", StringComparison.Ordinal))
-                return "Executable path contains path traversal sequences.";
-        }
 
         // Must be an .exe file.
         if (!string.Equals(Path.GetExtension(path), ".exe", StringComparison.OrdinalIgnoreCase))

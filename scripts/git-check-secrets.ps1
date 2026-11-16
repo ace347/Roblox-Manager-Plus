@@ -7,6 +7,18 @@ $ErrorActionPreference = "Stop"
 
 Write-Host "=== Scanning for Sensitive Data & Secrets ===" -ForegroundColor Cyan
 
+$repoRoot = (git -C "$PSScriptRoot\.." rev-parse --show-toplevel).Trim()
+if (-not $repoRoot) {
+    Write-Error "Could not locate the Git repository root."
+    exit 1
+}
+
+if ([System.IO.Path]::IsPathRooted($TargetDir)) {
+    $targetPath = [System.IO.Path]::GetFullPath($TargetDir)
+} else {
+    $targetPath = [System.IO.Path]::GetFullPath((Join-Path $repoRoot $TargetDir))
+}
+
 # Avoid false positive matching of the scanner script itself
 $tokenName = '_ROBLO' + 'SECURITY'
 $secretPatterns = @(
@@ -18,29 +30,42 @@ $secretPatterns = @(
     '-----BEGIN (RSA|EC|OPENSSH|PRIVATE) KEY-----'
 )
 
-$stagedFiles = git diff --cached --name-only
-if (-not $stagedFiles) {
-    # Check untracked and modified if nothing staged
-    $stagedFiles = git status --porcelain | ForEach-Object { 
-        if ($_.Length -ge 3) { $_.Substring(3).Trim() } 
-    }
-}
+$stagedFiles = @(git -C $repoRoot diff --cached --name-only)
+$repositoryFiles = @(git -C $repoRoot ls-files --cached --others --exclude-standard)
+$targetPrefix = $targetPath.TrimEnd([char[]]@('\', '/')) + [System.IO.Path]::DirectorySeparatorChar
+$filesToScan = @($repositoryFiles | Where-Object {
+    $fullPath = [System.IO.Path]::GetFullPath((Join-Path $repoRoot $_))
+    $fullPath.Equals($targetPath, [System.StringComparison]::OrdinalIgnoreCase) -or
+        $fullPath.StartsWith($targetPrefix, [System.StringComparison]::OrdinalIgnoreCase)
+}) | Sort-Object -Unique
 
 $violationsFound = $false
 
-foreach ($file in $stagedFiles) {
+foreach ($file in $filesToScan) {
     if (-not $file) { continue }
     if ($file -like "*git-check-secrets.ps1*") { continue }
-    if (-not (Test-Path $file)) { continue }
+    $filePath = Join-Path $repoRoot $file
+    if (-not (Test-Path $filePath)) { continue }
     if ($file -match '\.(png|jpg|ico|exe|dll|db|wal|shm)$') { continue }
 
-    $content = Get-Content $file -Raw -ErrorAction SilentlyContinue
-    if (-not $content) { continue }
+    $contents = @()
+    $workingTreeContent = Get-Content $filePath -Raw -ErrorAction SilentlyContinue
+    if ($workingTreeContent) { $contents += $workingTreeContent }
+
+    if ($stagedFiles -contains $file) {
+        $stagedContent = git -C $repoRoot show ":$file" 2>$null
+        if ($stagedContent) { $contents += ($stagedContent -join "`n") }
+    }
+
+    if ($contents.Count -eq 0) { continue }
 
     foreach ($pattern in $secretPatterns) {
-        if ($content -match $pattern) {
-            Write-Error "[SECURITY VIOLATION] Possible secret pattern matched in file '$file' (Pattern: $pattern)"
-            $violationsFound = $true
+        foreach ($content in $contents) {
+            if ($content -match $pattern) {
+                Write-Error "[SECURITY VIOLATION] Possible secret pattern matched in file '$file' (Pattern: $pattern)"
+                $violationsFound = $true
+                break
+            }
         }
     }
 }

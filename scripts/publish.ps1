@@ -11,6 +11,9 @@ dotnet publish ./src/RobloxAccountManager.App/RobloxAccountManager.App.csproj `
     --runtime win-x64 `
     --self-contained false `
     --output $OutputPath
+if ($LASTEXITCODE -ne 0) {
+    exit $LASTEXITCODE
+}
 
 Write-Host "Application published to $OutputPath" -ForegroundColor Green
 

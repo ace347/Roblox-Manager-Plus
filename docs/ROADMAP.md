@@ -61,13 +61,23 @@ This document outlines the delivery phases, milestones, and verification criteri
 - [x] 10 automated tests (validation, missing Roblox, invalid URL scheme, controlled launch) — `COMPLETED`
 - [x] DI registration in App startup — `COMPLETED`
 
-### Phase 6: Hardening, Sanitization & Privacy Assurance
-- [ ] Serilog sensitive token masking filter — `PLANNED`
-- [ ] Verify zero background telemetry or third-party tracking — `PLANNED`
-- [ ] Export/Import with user-provided passphrase & key derivation — `PLANNED`
+### Phase 6: Hardening, Sanitization & Privacy Assurance — `BLOCKED`
+- [x] Activate structured string redaction in the configured Serilog file logger and add regression coverage — `COMPLETED`
+- [x] Reject invalid client signatures at discovery and immediately before launch; correct traversal-segment check — `COMPLETED`
+- [x] Configure WAL outside migration transactions and enable foreign keys on every connection — `COMPLETED`
+- [x] Correct build/test/publish exit-code handling and extend staged/working-tree secret scanning — `COMPLETED`
+- [x] Release build and complete automated suite — `COMPLETED` (63 passed, 0 failed, 0 skipped)
+- [x] Update security, architecture, schema, testing, development, README, and audit documentation — `COMPLETED` ([Phase 6 Audit](PHASE6_AUDIT.md))
+- [x] Run dependency vulnerability scan — `COMPLETED` (no vulnerable packages after SQLite/.NET 10 updates)
+- [x] Run Release compiler/analyzer build — `COMPLETED` (zero warnings, zero errors)
+- [x] Verify formatting on all touched C# files — `COMPLETED`
+- [ ] Resolve repository-wide `dotnet format --verify-no-changes` failures — `BLOCKED` (pre-existing CRLF mismatches across untouched files)
+- [ ] Startup, corruption/recovery, concurrency, and WPF manual verification — `BLOCKED` (not run; avoid production profile/data)
+- [ ] Measure startup, rendering, search, memory, idle CPU, and responsiveness before considering optimization — `BLOCKED` (no baseline captured)
+- [ ] Implement export/import — `DEFERRED`; outside the requested audit scope and not needed for current security boundary
 
 ### Phase 7: Optimization, Performance & Full Test Suite
-- [ ] UI virtualization verification for large account datasets — `PLANNED`
+- [ ] UI virtualization verification for large account datasets — `PLANNED` (not started)
 - [ ] Startup time benchmarks (< 1.5s target) — `PLANNED`
 - [ ] End-to-end integration test execution — `PLANNED`
 

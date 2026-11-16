@@ -10,18 +10,18 @@
     <PackageVersion Include="Wpf.Ui" Version="3.4.2.7" />
 
     <!-- Microsoft Extensions -->
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0-preview.1.25080.5" />
-    <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.0-preview.1.25080.5" />
-    <PackageVersion Include="Microsoft.Extensions.Configuration" Version="10.0.0-preview.1.25080.5" />
-    <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="10.0.0-preview.1.25080.5" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="10.0.14" />
 
     <!-- Data & Security -->
-    <PackageVersion Include="Microsoft.Data.Sqlite" Version="9.0.2" />
-    <PackageVersion Include="System.Security.Cryptography.ProtectedData" Version="9.0.2" />
+    <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.14" />
+    <PackageVersion Include="System.Security.Cryptography.ProtectedData" Version="10.0.14" />
 
     <!-- Logging -->
     <PackageVersion Include="Serilog" Version="4.2.0" />
-    <PackageVersion Include="Serilog.Extensions.Logging" Version="9.0.0" />
+    <PackageVersion Include="Serilog.Extensions.Logging" Version="10.0.0" />
     <PackageVersion Include="Serilog.Sinks.File" Version="6.0.0" />
 
     <!-- Testing -->

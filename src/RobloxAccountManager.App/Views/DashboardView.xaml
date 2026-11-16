@@ -3,10 +3,35 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:viewModels="clr-namespace:RobloxAccountManager.App.ViewModels"
              mc:Ignorable="d" 
              d:DesignHeight="600" d:DesignWidth="800">
-    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Margin="0,0,10,0">
+    <Grid>
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Margin="0,0,10,0">
+            <ProgressBar x:Name="DashboardLoadingIndicator" Height="3" Margin="0,0,0,14" IsIndeterminate="True"
+                         Visibility="{Binding IsLoading, Converter={StaticResource BoolToVis}}"/>
+            <Border x:Name="DashboardErrorBanner" Background="#3B1219" BorderBrush="#EF4444" BorderThickness="1" CornerRadius="8"
+                    Padding="12" Margin="0,0,0,16"
+                    Visibility="{Binding ErrorMessage, Converter={StaticResource BoolToVis}}">
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Content="Retry" Margin="12,0,0,0"
+                            Style="{StaticResource PrimaryAccentButton}" Command="{Binding RefreshCommand}"/>
+                    <TextBlock Text="{Binding ErrorMessage}" VerticalAlignment="Center"
+                               Foreground="#FCA5A5" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                </DockPanel>
+            </Border>
+            <Border Background="#3B3112" BorderBrush="#F59E0B" BorderThickness="1" CornerRadius="8"
+                    Padding="12" Margin="0,0,0,12"
+                    Visibility="{Binding HasUnmanagedPlayerProcess, Converter={StaticResource BoolToVis}}">
+                <TextBlock Text="A Roblox Player process is already running outside RAM Plus. It is not associated with a saved profile."
+                           Foreground="#FCD34D" TextWrapping="Wrap"/>
+            </Border>
+            <Border Background="#123B2A" BorderBrush="{StaticResource AccentGreenBrush}" BorderThickness="1" CornerRadius="8"
+                    Padding="12" Margin="0,0,0,12"
+                    Visibility="{Binding LaunchMessage, Converter={StaticResource BoolToVis}}">
+                <TextBlock Text="{Binding LaunchMessage}" Foreground="#A7F3D0" TextWrapping="Wrap"/>
+            </Border>
             <!-- Header Section -->
             <Grid Margin="0,0,0,24">
                 <Grid.ColumnDefinitions>
@@ -16,15 +41,18 @@
 
                 <StackPanel>
                     <TextBlock Text="Welcome Back" FontSize="26" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/>
-                    <TextBlock Text="Manage your accounts, review security status, and launch sessions." 
+                    <TextBlock Text="Manage saved profiles and locally observed Roblox Player processes." 
                                FontSize="14" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,4,0,0"/>
                 </StackPanel>
 
-                <Button Grid.Column="1" Content="+ Add Account" Style="{StaticResource PrimaryAccentButton}" VerticalAlignment="Center"/>
+                <Button Grid.Column="1" Content="+ Add Account" Style="{StaticResource PrimaryAccentButton}"
+                    VerticalAlignment="Center"
+                    Command="{Binding DataContext.NavigateCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                    CommandParameter="{x:Static viewModels:NavigationPage.Accounts}"/>
             </Grid>
 
             <!-- Metrics Cards Grid -->
-            <Grid Margin="0,0,0,24">
+            <Grid x:Name="DashboardMetricsGrid" Margin="0,0,0,24">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="16"/>
@@ -38,25 +66,25 @@
                     <StackPanel>
                         <TextBlock Text="TOTAL SAVED" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}"/>
                         <TextBlock Text="{Binding TotalAccountsCount}" FontSize="28" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,6,0,0"/>
-                        <TextBlock Text="Encrypted via DPAPI" FontSize="12" Foreground="{StaticResource AccentPurpleBrush}" Margin="0,4,0,0"/>
+                        <TextBlock Text="Account profiles in the local vault" FontSize="12" Foreground="{StaticResource AccentPurpleBrush}" Margin="0,4,0,0"/>
                     </StackPanel>
                 </Border>
 
                 <!-- Active Sessions Card -->
                 <Border Grid.Column="2" Style="{StaticResource DashboardCard}">
                     <StackPanel>
-                        <TextBlock Text="ACTIVE SESSIONS" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}"/>
-                        <TextBlock Text="{Binding ActiveSessionsCount}" FontSize="28" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,6,0,0"/>
-                        <TextBlock Text="Roblox Player running" FontSize="12" Foreground="{StaticResource AccentElectricBlueBrush}" Margin="0,4,0,0"/>
+                        <TextBlock Text="PLAYER PROCESSES" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}"/>
+                        <TextBlock Text="{Binding ActiveSessionsCount, TargetNullValue=Unavailable}" FontSize="28" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,6,0,0"/>
+                        <TextBlock Text="Observed by Windows; sign-in unverified" FontSize="12" Foreground="{StaticResource AccentElectricBlueBrush}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                     </StackPanel>
                 </Border>
 
                 <!-- Vault Health Card -->
-                <Border Grid.Column="4" Style="{StaticResource DashboardCard}">
+                <Border x:Name="StoredSecretsCard" Grid.Column="4" Style="{StaticResource DashboardCard}">
                     <StackPanel>
-                        <TextBlock Text="VAULT SECURITY" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}"/>
-                        <TextBlock Text="Protected" FontSize="28" FontWeight="Bold" Foreground="{StaticResource AccentGreenBrush}" Margin="0,6,0,0"/>
-                        <TextBlock Text="{Binding SecurityStatus}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,4,0,0"/>
+                        <TextBlock Text="STORED SECRETS" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}"/>
+                        <TextBlock Text="{Binding StoredSecretsCount}" FontSize="28" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,6,0,0"/>
+                        <TextBlock Text="Saved through the DPAPI vault" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,4,0,0"/>
                     </StackPanel>
                 </Border>
             </Grid>
@@ -74,9 +102,16 @@
                     <StackPanel>
                         <Grid Margin="0,0,0,16">
                             <TextBlock Text="Recent Accounts" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
-                            <TextBlock Text="View All" HorizontalAlignment="Right" Foreground="{StaticResource AccentElectricBlueBrush}" Cursor="Hand" FontSize="13"/>
+                            <Button Content="View All" HorizontalAlignment="Right" Background="Transparent"
+                                    Foreground="{StaticResource AccentElectricBlueBrush}" BorderThickness="0"
+                                    Padding="0" FontSize="13"
+                                    Command="{Binding DataContext.NavigateCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    CommandParameter="{x:Static viewModels:NavigationPage.Accounts}"/>
                         </Grid>
 
+                        <TextBlock Text="No accounts yet. Add a profile to see it here."
+                                   Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,12"
+                                   Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVis}}"/>
                         <ItemsControl ItemsSource="{Binding RecentAccounts}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
@@ -102,10 +137,15 @@
                                                     </Border>
                                                 </StackPanel>
                                                 <TextBlock Text="{Binding Username}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0"/>
+                                                <TextBlock Text="{Binding AuthenticationStatus}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0"/>
                                             </StackPanel>
 
                                             <!-- Launch Action -->
-                                            <Button Grid.Column="2" Content="Launch" Style="{StaticResource PrimaryAccentButton}" Padding="12,6" FontSize="12" VerticalAlignment="Center"/>
+                                                <Button Grid.Column="2" Content="Launch" Style="{StaticResource PrimaryAccentButton}"
+                                                    Padding="12,6" FontSize="12" VerticalAlignment="Center"
+                                                    Command="{Binding DataContext.LaunchAccountCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    ToolTip="Launch the official Player; sign-in cannot be verified by RAM Plus."/>
                                         </Grid>
                                     </Border>
                                 </DataTemplate>
@@ -118,7 +158,7 @@
                 <Border Grid.Column="2" Style="{StaticResource DashboardCard}">
                     <StackPanel>
                         <TextBlock Text="Quick Launch" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
-                        <TextBlock Text="Select default account and start instantly." FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,4,0,16"/>
+                        <TextBlock Text="Launch the selected saved profile through the official Player." FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,4,0,16" TextWrapping="Wrap"/>
 
                         <Border Background="{StaticResource SidebarBgBrush}" CornerRadius="8" Padding="12" Margin="0,0,0,16">
                             <StackPanel>
@@ -128,11 +168,14 @@
                             </StackPanel>
                         </Border>
 
-                        <Button Content="▶ Start Roblox Client" Style="{StaticResource PrimaryAccentButton}" Height="40" Margin="0,0,0,10" Command="{Binding QuickLaunchCommand}"/>
-                        <TextBlock Text="Official client will launch via direct executable isolation." FontSize="11" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" HorizontalAlignment="Center"/>
+                        <Button Content="Launch Roblox Player" Style="{StaticResource PrimaryAccentButton}"
+                            Height="40" Margin="0,0,0,10" Command="{Binding QuickLaunchCommand}"/>
+                        <TextBlock Text="Sign in manually in the official client. RAM Plus cannot verify the signed-in account. Only one Player process is managed at a time."
+                                   FontSize="11" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Border>
             </Grid>
         </StackPanel>
-    </ScrollViewer>
+        </ScrollViewer>
+    </Grid>
 </UserControl>
