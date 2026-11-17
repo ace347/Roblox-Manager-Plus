@@ -74,47 +74,70 @@
                                TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
-            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                <ItemsControl ItemsSource="{Binding Sessions}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Border Style="{StaticResource DashboardCard}" Margin="0,0,0,10">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding AccountUsername}" FontSize="17" FontWeight="Bold"
-                                                   Foreground="{StaticResource TextPrimaryBrush}"/>
-                                        <TextBlock Text="{Binding AccountDisplayName}" Margin="0,2,0,0"
-                                                   Foreground="{StaticResource TextSecondaryBrush}"/>
-                                        <TextBlock Text="{Binding Status}" Margin="0,8,0,0"
-                                                   Foreground="{StaticResource AccentElectricBlueBrush}"/>
-                                        <TextBlock Text="{Binding AuthenticationStatus}" Margin="0,2,0,0"
-                                                   Foreground="{StaticResource TextMutedBrush}"/>
-                                        <TextBlock Text="{Binding ProcessId, StringFormat=PID: {0}, TargetNullValue=PID: unavailable}"
-                                                   Margin="0,8,0,0" Foreground="{StaticResource TextSecondaryBrush}"/>
-                                        <TextBlock Text="{Binding LaunchedAtUtc, StringFormat=Launched: {0:g}}"
-                                                   Foreground="{StaticResource TextSecondaryBrush}"/>
-                                        <TextBlock Text="{Binding ExecutablePath}" Foreground="{StaticResource TextMutedBrush}"
-                                                   TextWrapping="Wrap"/>
-                                        <TextBlock Text="{Binding LastError}" Margin="0,4,0,0"
-                                                   Foreground="#FCA5A5" TextWrapping="Wrap"
-                                                   Visibility="{Binding LastError, Converter={StaticResource BoolToVis}}"/>
-                                    </StackPanel>
-                                    <Button Grid.Column="1" Content="Close Session"
-                                            VerticalAlignment="Top" Margin="12,0,0,0"
-                                            Background="#3D1A24" Foreground="#F87171"
-                                            Padding="12,7" BorderThickness="0"
-                                            Command="{Binding DataContext.CloseSessionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                            CommandParameter="{Binding}"/>
-                                </Grid>
-                            </Border>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </ScrollViewer>
+            <ListBox ItemsSource="{Binding Sessions}"
+                     Background="Transparent"
+                     BorderThickness="0"
+                     Padding="0"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                     ScrollViewer.CanContentScroll="True"
+                     VirtualizingStackPanel.IsVirtualizing="True"
+                     VirtualizingStackPanel.VirtualizationMode="Recycling"
+                     VirtualizingStackPanel.ScrollUnit="Pixel">
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="Padding" Value="0"/>
+                        <Setter Property="Margin" Value="0"/>
+                        <Setter Property="Background" Value="Transparent"/>
+                        <Setter Property="BorderThickness" Value="0"/>
+                        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ListBoxItem">
+                                    <ContentPresenter/>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </ListBox.ItemContainerStyle>
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Border Style="{StaticResource DashboardCard}" Margin="0,0,0,10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="{Binding AccountUsername}" FontSize="17" FontWeight="Bold"
+                                               Foreground="{StaticResource TextPrimaryBrush}"/>
+                                    <TextBlock Text="{Binding AccountDisplayName}" Margin="0,2,0,0"
+                                               Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    <TextBlock Text="{Binding Status}" Margin="0,8,0,0"
+                                               Foreground="{StaticResource AccentElectricBlueBrush}"/>
+                                    <TextBlock Text="{Binding AuthenticationStatus}" Margin="0,2,0,0"
+                                               Foreground="{StaticResource TextMutedBrush}"/>
+                                    <TextBlock Text="{Binding ProcessId, StringFormat=PID: {0}, TargetNullValue=PID: unavailable}"
+                                               Margin="0,8,0,0" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    <TextBlock Text="{Binding LaunchedAtUtc, StringFormat=Launched: {0:g}}"
+                                               Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    <TextBlock Text="{Binding ExecutablePath}" Foreground="{StaticResource TextMutedBrush}"
+                                               TextWrapping="Wrap"/>
+                                    <TextBlock Text="{Binding LastError}" Margin="0,4,0,0"
+                                               Foreground="#FCA5A5" TextWrapping="Wrap"
+                                               Visibility="{Binding LastError, Converter={StaticResource BoolToVis}}"/>
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="Close Session"
+                                        VerticalAlignment="Top" Margin="12,0,0,0"
+                                        Background="#3D1A24" Foreground="#F87171"
+                                        Padding="12,7" BorderThickness="0"
+                                        Command="{Binding DataContext.CloseSessionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}"/>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
         </Grid>
     </Grid>
 </UserControl>

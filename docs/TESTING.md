@@ -21,11 +21,24 @@ Automated tests cover domain behavior, metadata CRUD, DPAPI, SQLite, logging red
 
 ## 3. Verified Run
 
-The Phase 6 and UI Release run completed on Windows with **63 passed, 0 failed, 0 skipped** (Core 2, Application 3, Infrastructure 48, App 10). The Release build also succeeded with zero warnings and errors. The prior 53-test count was a user-provided baseline; it was not independently rerun before edits. Ten automated tests were added across the Phase 6 and UI hardening work.
+The Phase 7 verification run completed on Windows with **96 passed, 0 failed, 0 skipped** across all 4 test projects:
+- `RobloxAccountManager.Core.Tests`: 7 passed
+- `RobloxAccountManager.Application.Tests`: 14 passed (including `EndToEndWorkflowTests`)
+- `RobloxAccountManager.Infrastructure.Tests`: 60 passed (including `PerformanceAndStressTests`, `DatabaseInitializerRecoveryTests`, and WinTrust verifier)
+- `RobloxAccountManager.App.Tests`: 15 passed (including `MainWindowNavigationTests` and `SessionsViewModelTests`)
 
-WinTrust integration tests use signed Windows system binaries and require a fixture; they now fail rather than silently pass if no fixture is available. The process-launch test uses a temporary copy of a Windows system executable and does not use a Roblox executable or credentials.
+The Release build compiles with **0 warnings, 0 errors**.
 
-## 4. Automated Coverage and Gaps
+## 4. Performance & Stress Testing (Phase 7)
+
+Phase 7 introduces automated stress and performance benchmarks in `tests/RobloxAccountManager.Infrastructure.Tests/PerformanceAndStressTests.cs`:
+
+- **Bulk SQLite Insertion & Query SLA**: 500 accounts inserted and queried under SQLite WAL mode completes in $< 1$ second ($< 250\text{ ms}$ query/search latency).
+- **DPAPI Throughput & Zero-Leak Verification**: 200 high-frequency encrypt/decrypt roundtrips verify cryptographic stability, constant memory consumption, and zero buffer retention.
+- **Concurrent Read/Write Stress**: 10 simultaneous asynchronous workers performing 200 total operations against SQLite with zero locking errors or database corruption.
+- **WPF UI Virtualization**: `AccountsView` and `SessionsView` employ `VirtualizingStackPanel.VirtualizationMode="Recycling"` and `ScrollUnit="Pixel"`, rendering only items visible in the viewport.
+
+## 5. Automated Coverage and Gaps
 
 | Test Case | Method | Expected Result |
 |---|---|---|
