@@ -21,7 +21,7 @@ public class MainViewModelTests
         var sessionsVm = new SessionsViewModel(mockService.Object, clientSessions.Object);
         var mainVm = new MainViewModel(dashVm, accVm, sessionsVm);
 
-        mainVm.Title.Should().Be("Secure Roblox Account Manager");
+        mainVm.Title.Should().Be("Roblox-sessions — TheEgos");
         mainVm.CurrentPage.Should().Be(NavigationPage.Dashboard);
         mainVm.DashboardVm.Should().BeSameAs(dashVm);
         mainVm.AccountsVm.Should().BeSameAs(accVm);

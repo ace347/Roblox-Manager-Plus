@@ -26,7 +26,7 @@ public partial class MainViewModel : ObservableObject
         "There are no user-configurable settings in this version.");
 
     [ObservableProperty]
-    private string _title = "Secure Roblox Account Manager";
+    private string _title = "Roblox-sessions — TheEgos";
 
     [ObservableProperty]
     private NavigationPage _currentPage = NavigationPage.Dashboard;
