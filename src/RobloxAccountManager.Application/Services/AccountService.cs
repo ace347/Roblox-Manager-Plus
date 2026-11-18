@@ -1,6 +1,8 @@
+using System.Text;
 using Microsoft.Extensions.Logging;
 using RobloxAccountManager.Core.Interfaces;
 using RobloxAccountManager.Core.Models;
+using RobloxAccountManager.Core.Security;
 
 namespace RobloxAccountManager.Application.Services;
 
@@ -9,8 +11,8 @@ public interface IAccountService
     Task<IReadOnlyList<Account>> GetAccountsAsync(CancellationToken cancellationToken = default);
     Task<Account?> GetAccountByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Account>> SearchAccountsAsync(string searchTerm, string? tag = null, CancellationToken cancellationToken = default);
-    Task CreateAccountAsync(string username, string? displayName, string? tag, string? notes, bool isDefault, CancellationToken cancellationToken = default);
-    Task UpdateAccountMetadataAsync(Guid id, string username, string? displayName, string? tag, string? notes, bool isDefault, CancellationToken cancellationToken = default);
+    Task CreateAccountAsync(string username, string? displayName, string? tag, string? notes, bool isDefault, string? secretCookie = null, CancellationToken cancellationToken = default);
+    Task UpdateAccountMetadataAsync(Guid id, string username, string? displayName, string? tag, string? notes, bool isDefault, string? secretCookie = null, CancellationToken cancellationToken = default);
     Task DeleteAccountAsync(Guid id, CancellationToken cancellationToken = default);
     Task SetDefaultAccountAsync(Guid id, CancellationToken cancellationToken = default);
 }
@@ -18,12 +20,17 @@ public interface IAccountService
 public sealed class AccountService : IAccountService
 {
     private readonly IAccountRepository _repository;
+    private readonly ICredentialVault? _credentialVault;
     private readonly ILogger<AccountService> _logger;
 
-    public AccountService(IAccountRepository repository, ILogger<AccountService> logger)
+    public AccountService(
+        IAccountRepository repository,
+        ILogger<AccountService> logger,
+        ICredentialVault? credentialVault = null)
     {
         _repository = repository;
         _logger = logger;
+        _credentialVault = credentialVault;
     }
 
     public async Task<IReadOnlyList<Account>> GetAccountsAsync(CancellationToken cancellationToken = default)
@@ -47,7 +54,7 @@ public sealed class AccountService : IAccountService
         return await _repository.SearchAsync(searchTerm.Trim(), tag, cancellationToken);
     }
 
-    public async Task CreateAccountAsync(string username, string? displayName, string? tag, string? notes, bool isDefault, CancellationToken cancellationToken = default)
+    public async Task CreateAccountAsync(string username, string? displayName, string? tag, string? notes, bool isDefault, string? secretCookie = null, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(username))
         {
@@ -67,13 +74,20 @@ public sealed class AccountService : IAccountService
             Tag = string.IsNullOrWhiteSpace(tag) ? "Main" : tag.Trim(),
             Notes = notes?.Trim(),
             IsDefault = isDefault,
-            EncryptedSecret = Array.Empty<byte>() // Credentials will be handled via DPAPI in Phase 4
+            EncryptedSecret = Array.Empty<byte>()
         };
 
         await _repository.AddAsync(account, cancellationToken);
+
+        if (!string.IsNullOrWhiteSpace(secretCookie) && _credentialVault != null)
+        {
+            var cookieBytes = Encoding.UTF8.GetBytes(secretCookie.Trim());
+            using var buffer = new SensitiveBuffer(cookieBytes);
+            await _credentialVault.StoreSecretAsync(account.Id, buffer, cancellationToken);
+        }
     }
 
-    public async Task UpdateAccountMetadataAsync(Guid id, string username, string? displayName, string? tag, string? notes, bool isDefault, CancellationToken cancellationToken = default)
+    public async Task UpdateAccountMetadataAsync(Guid id, string username, string? displayName, string? tag, string? notes, bool isDefault, string? secretCookie = null, CancellationToken cancellationToken = default)
     {
         var account = await _repository.GetByIdAsync(id, cancellationToken);
         if (account == null)
@@ -103,6 +117,13 @@ public sealed class AccountService : IAccountService
         account.IsDefault = isDefault;
 
         await _repository.UpdateAsync(account, cancellationToken);
+
+        if (!string.IsNullOrWhiteSpace(secretCookie) && _credentialVault != null)
+        {
+            var cookieBytes = Encoding.UTF8.GetBytes(secretCookie.Trim());
+            using var buffer = new SensitiveBuffer(cookieBytes);
+            await _credentialVault.StoreSecretAsync(account.Id, buffer, cancellationToken);
+        }
     }
 
     public async Task DeleteAccountAsync(Guid id, CancellationToken cancellationToken = default)

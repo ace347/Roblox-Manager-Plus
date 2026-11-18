@@ -172,9 +172,7 @@ public partial class SessionsViewModel : ObservableObject
     private bool CanLaunchSelected() =>
         SelectedAccount is not null &&
         !IsLoading &&
-        !IsLaunching &&
-        !HasUnmanagedPlayerProcess &&
-        Sessions.All(session => !session.IsActive);
+        !IsLaunching;
 
     private static bool CanCloseSession(ClientSession? session) =>
         session?.Status == ClientSessionStatus.Running;

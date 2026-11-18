@@ -51,7 +51,19 @@ public partial class AccountsViewModel : ObservableObject
     private string _formNotes = string.Empty;
 
     [ObservableProperty]
+    private string _formCookie = string.Empty;
+
+    [ObservableProperty]
     private bool _formIsDefault;
+
+    private readonly IClientSessionService? _sessionService;
+
+    /// <summary>
+    /// Raised when the ViewModel needs the View to open the Roblox login WebView window.
+    /// The View opens the window, then invokes this delegate with the captured cookie + username + displayName,
+    /// or returns null if the user cancelled.
+    /// </summary>
+    public event Func<Task<(string Cookie, string Username, string DisplayName)?>>? RequestRobloxLogin;
 
     public ObservableCollection<AccountDisplayModel> Accounts { get; } = new();
 
@@ -60,9 +72,10 @@ public partial class AccountsViewModel : ObservableObject
         "All", "Main", "Alt", "Developer", "Trading"
     };
 
-    public AccountsViewModel(IAccountService accountService)
+    public AccountsViewModel(IAccountService accountService, IClientSessionService? sessionService = null)
     {
         _accountService = accountService;
+        _sessionService = sessionService;
     }
 
     public async Task InitializeAsync()
@@ -122,6 +135,7 @@ public partial class AccountsViewModel : ObservableObject
         FormDisplayName = string.Empty;
         FormTag = "Main";
         FormNotes = string.Empty;
+        FormCookie = string.Empty;
         FormIsDefault = false;
         IsDialogOpen = true;
     }
@@ -137,6 +151,7 @@ public partial class AccountsViewModel : ObservableObject
         FormDisplayName = account.DisplayName;
         FormTag = account.Tag;
         FormNotes = account.Notes ?? string.Empty;
+        FormCookie = string.Empty;
         FormIsDefault = account.IsDefault;
         IsDialogOpen = true;
     }
@@ -145,6 +160,57 @@ public partial class AccountsViewModel : ObservableObject
     private void CloseDialog()
     {
         IsDialogOpen = false;
+    }
+
+    [RelayCommand]
+    private async Task LaunchAccountAsync(AccountDisplayModel? account)
+    {
+        if (account == null || _sessionService == null) return;
+
+        try
+        {
+            ErrorMessage = null;
+            await _sessionService.LaunchAsync(account.Id);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Failed to launch {account.Username}: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private async Task LoginWithRobloxAsync()
+    {
+        if (RequestRobloxLogin is null) return;
+
+        var result = await RequestRobloxLogin.Invoke();
+        if (result is null) return; // user cancelled
+
+        var (cookie, username, displayName) = result.Value;
+
+        if (string.IsNullOrWhiteSpace(username) || username == "{}")
+        {
+            ErrorMessage = "Could not identify Roblox username from login session.";
+            return;
+        }
+
+        try
+        {
+            ErrorMessage = null;
+            await _accountService.CreateAccountAsync(
+                username,
+                displayName: string.IsNullOrWhiteSpace(displayName) ? username : displayName,
+                tag: "Main",
+                notes: string.Empty,
+                isDefault: false,
+                secretCookie: cookie
+            );
+            await LoadAccountsAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Failed to save account: {ex.Message}";
+        }
     }
 
     [RelayCommand]
@@ -166,7 +232,8 @@ public partial class AccountsViewModel : ObservableObject
                     FormDisplayName,
                     FormTag,
                     FormNotes,
-                    FormIsDefault
+                    FormIsDefault,
+                    string.IsNullOrWhiteSpace(FormCookie) ? null : FormCookie
                 );
             }
             else
@@ -176,7 +243,8 @@ public partial class AccountsViewModel : ObservableObject
                     FormDisplayName,
                     FormTag,
                     FormNotes,
-                    FormIsDefault
+                    FormIsDefault,
+                    string.IsNullOrWhiteSpace(FormCookie) ? null : FormCookie
                 );
             }
 

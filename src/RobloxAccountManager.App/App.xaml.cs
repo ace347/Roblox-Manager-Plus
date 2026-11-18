@@ -1,4 +1,5 @@
 using System.IO;
+using System.Net.Http;
 using System.Security;
 using System.Windows;
 using Microsoft.Data.Sqlite;
@@ -39,6 +40,8 @@ public partial class App : WpfApp
         var dbInit = _serviceProvider.GetRequiredService<DatabaseInitializer>();
         var mainVm = _serviceProvider.GetRequiredService<MainViewModel>();
         var mainWindow = _serviceProvider.GetRequiredService<MainWindow>();
+        var multiInstance = _serviceProvider.GetRequiredService<IRobloxMultiInstanceManager>();
+        multiInstance.Enable();
         mainVm.DashboardVm.IsLoading = true;
         mainWindow.Show();
 
@@ -72,9 +75,20 @@ public partial class App : WpfApp
         services.AddSingleton<IEncryptionService, DpapiEncryptionService>();
         services.AddSingleton<ICredentialVault, CredentialVault>();
         services.AddSingleton<IAuthenticodeVerifier, WinTrustAuthenticodeVerifier>();
+        services.AddSingleton<HttpClient>();
+        services.AddSingleton<IRobloxAuthTicketService, RobloxAuthTicketService>();
         services.AddSingleton<RobloxClientLocator>();
         services.AddSingleton<IRobloxLauncher, RobloxProcessLauncher>();
-        services.AddSingleton<IClientSessionService, ClientSessionService>();
+        services.AddSingleton<IRobloxMultiInstanceManager, RobloxMultiInstanceManager>();
+        services.AddSingleton<IClientSessionService>(sp => new ClientSessionService(
+            sp.GetRequiredService<IAccountRepository>(),
+            sp.GetRequiredService<IClientSessionRepository>(),
+            sp.GetRequiredService<IClientProcessInspector>(),
+            sp.GetRequiredService<IRobloxLauncher>(),
+            sp.GetRequiredService<ICredentialVault>(),
+            sp.GetRequiredService<IRobloxAuthTicketService>(),
+            sp.GetRequiredService<IRobloxMultiInstanceManager>()
+        ));
         services.AddScoped<IAccountService, AccountService>();
 
         services.AddSingleton<DashboardViewModel>();

@@ -14,9 +14,7 @@ $extraArgs = @()
 if ($SingleFile) {
     $extraArgs += "-p:PublishSingleFile=true"
     $extraArgs += "-p:IncludeNativeLibrariesForSelfExtract=true"
-    if ($SelfContained) {
-        $extraArgs += "-p:EnableCompressionInSingleFile=true"
-    }
+    $extraArgs += "-p:EnableCompressionInSingleFile=true"
 }
 
 dotnet publish ./src/RobloxAccountManager.App/RobloxAccountManager.App.csproj `

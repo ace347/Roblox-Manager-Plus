@@ -11,7 +11,8 @@ namespace RobloxAccountManager.Infrastructure.RobloxIntegration;
 /// Roblox player executable.
 ///
 /// Security constraints enforced here:
-/// - Only the official roblox:// URI scheme is accepted as an argument.
+/// - Only the official roblox:// and roblox-player: URI schemes are accepted as arguments.
+/// - Auth tickets are passed via the roblox-player: protocol URI (the only method supported by modern Roblox).
 /// - Arguments are passed via <see cref="ProcessStartInfo.ArgumentList"/> (no shell interpolation).
 /// - The executable path is validated before use.
 /// - No credentials, session tokens, or authentication parameters are injected.
@@ -19,8 +20,8 @@ namespace RobloxAccountManager.Infrastructure.RobloxIntegration;
 /// </summary>
 public sealed class RobloxProcessLauncher : IRobloxLauncher
 {
-    // Only the official roblox:// URI scheme is permitted as a launch argument.
-    private const string AllowedUriScheme = "roblox";
+    // Official Roblox URI schemes permitted as launch arguments.
+    private static readonly string[] AllowedUriSchemes = ["roblox", "roblox-player"];
 
     private readonly RobloxClientLocator _locator;
     private readonly ILogger<RobloxProcessLauncher> _logger;
@@ -44,6 +45,7 @@ public sealed class RobloxProcessLauncher : IRobloxLauncher
     public async Task<LaunchResult> LaunchAsync(
         RobloxInstallation installation,
         string? placeUrl = null,
+        string? authTicket = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(installation);
@@ -67,42 +69,91 @@ public sealed class RobloxProcessLauncher : IRobloxLauncher
             }
         }
 
-        // 3. Build ProcessStartInfo — no shell, explicit argument list.
-        var psi = new ProcessStartInfo
+        // 3. Verify Authenticode signature before launch.
+        var verification = await Task.Run(
+            () => _locator.VerifyExecutable(installation.ExecutablePath),
+            cancellationToken).ConfigureAwait(false);
+        if (!verification.IsValid)
         {
-            FileName = installation.ExecutablePath,
-            UseShellExecute = false,
-            CreateNoWindow = false,
-            RedirectStandardOutput = false,
-            RedirectStandardError = false,
-            RedirectStandardInput = false,
-        };
-
-        if (placeUrl is not null)
-        {
-            // Use ArgumentList (not Arguments string) to avoid shell injection.
-            psi.ArgumentList.Add(placeUrl);
+            _logger.LogWarning(
+                "Refusing to launch executable with invalid Authenticode signature: {Path} ({Status})",
+                installation.ExecutablePath, verification.Status);
+            return LaunchResult.Failed($"Executable signature verification failed: {verification.Status}.");
         }
 
-        // 4. Launch.
+        // 4. Build the launch URI and ProcessStartInfo.
+        //    Modern Roblox only accepts auth tickets via the roblox-player: URI protocol.
+        //    Passing --app -t <ticket> directly to the exe no longer works.
+        ProcessStartInfo psi;
+
+        if (!string.IsNullOrWhiteSpace(authTicket))
+        {
+            // Build a roblox-player: URI that embeds the auth ticket in gameinfo.
+            // This is the same URI that the Roblox website sends to the client.
+            var launchTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            var browserId = Random.Shared.NextInt64(100_000_000, 999_999_999);
+
+            string launchUri;
+            if (placeUrl is not null && Uri.TryCreate(placeUrl, UriKind.Absolute, out var parsedPlace))
+            {
+                // Launch directly into a specific place.
+                var encodedPlaceLauncher = Uri.EscapeDataString(
+                    $"https://assetgame.roblox.com/game/PlaceLauncher.ashx?request=RequestGame&{parsedPlace.Query.TrimStart('?')}");
+                launchUri =
+                    $"roblox-player:1+launchmode:play" +
+                    $"+gameinfo:{authTicket.Trim()}" +
+                    $"+launchtime:{launchTime}" +
+                    $"+placelauncherurl:{encodedPlaceLauncher}" +
+                    $"+browsertrackerid:{browserId}" +
+                    $"+robloxLocale:en_us+gameLocale:en_us";
+            }
+            else
+            {
+                // No specific place — open the Roblox app home screen authenticated.
+                launchUri =
+                    $"roblox-player:1+launchmode:app" +
+                    $"+gameinfo:{authTicket.Trim()}" +
+                    $"+launchtime:{launchTime}" +
+                    $"+browsertrackerid:{browserId}" +
+                    $"+robloxLocale:en_us+gameLocale:en_us";
+            }
+
+            _logger.LogInformation(
+                "Launching Roblox via roblox-player URI (auth ticket present) | Exe: {Exe}",
+                installation.ExecutablePath);
+
+            // Pass the full URI as a single argument directly to the exe.
+            psi = new ProcessStartInfo
+            {
+                FileName = installation.ExecutablePath,
+                UseShellExecute = false,
+                CreateNoWindow = false,
+            };
+            psi.ArgumentList.Add(launchUri);
+        }
+        else
+        {
+            // No auth ticket — just open Roblox normally (user must sign in themselves).
+            psi = new ProcessStartInfo
+            {
+                FileName = installation.ExecutablePath,
+                UseShellExecute = false,
+                CreateNoWindow = false,
+            };
+
+            if (placeUrl is not null)
+                psi.ArgumentList.Add(placeUrl);
+        }
+
+        // 5. Launch.
         _logger.LogInformation(
-            "Launching Roblox client: {Exe} | PlaceUrl: {Url}",
+            "Launching Roblox client: {Exe} | PlaceUrl: {Url} | HasTicket: {HasTicket}",
             installation.ExecutablePath,
-            placeUrl ?? "(none)");
+            placeUrl ?? "(none)",
+            authTicket is not null);
 
         try
         {
-            var verification = await Task.Run(
-                () => _locator.VerifyExecutable(installation.ExecutablePath),
-                cancellationToken).ConfigureAwait(false);
-            if (!verification.IsValid)
-            {
-                _logger.LogWarning(
-                    "Refusing to launch executable with invalid Authenticode signature: {Path} ({Status})",
-                    installation.ExecutablePath, verification.Status);
-                return LaunchResult.Failed($"Executable signature verification failed: {verification.Status}.");
-            }
-
             // Offload to a thread pool thread to avoid blocking the UI thread on Process.Start().
             using var process = await Task.Run(() =>
             {
@@ -184,7 +235,7 @@ public sealed class RobloxProcessLauncher : IRobloxLauncher
     }
 
     /// <summary>
-    /// Validates that the place URL uses only the roblox:// scheme.
+    /// Validates that the place URL uses only an official Roblox URI scheme (roblox:// or roblox-player:).
     /// Returns an error string on failure, or null on success.
     /// </summary>
     public static string? ValidatePlaceUrl(string url)
@@ -195,8 +246,8 @@ public sealed class RobloxProcessLauncher : IRobloxLauncher
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
             return "Place URL is not a valid absolute URI.";
 
-        if (!string.Equals(uri.Scheme, AllowedUriScheme, StringComparison.OrdinalIgnoreCase))
-            return $"Place URL scheme '{uri.Scheme}' is not permitted. Only '{AllowedUriScheme}://' is allowed.";
+        if (!AllowedUriSchemes.Any(s => string.Equals(uri.Scheme, s, StringComparison.OrdinalIgnoreCase)))
+            return $"Place URL scheme '{uri.Scheme}' is not permitted. Only {string.Join(", ", AllowedUriSchemes.Select(s => $"'{s}://'"))} are allowed.";
 
         return null; // OK
     }

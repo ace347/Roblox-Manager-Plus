@@ -28,11 +28,11 @@ public sealed class ClientSessionServiceTests
         session.ExecutablePath.Should().Be(ExecutablePath);
         session.AuthenticationStatus.Should().Contain("Unverified");
         repository.Sessions.Should().ContainSingle();
-        launcher.Verify(value => value.LaunchAsync(It.IsAny<RobloxInstallation>(), null, It.IsAny<CancellationToken>()), Times.Once);
+        launcher.Verify(value => value.LaunchAsync(It.IsAny<RobloxInstallation>(), null, It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task LaunchAsync_RejectsSecondManagedSessionWithoutLaunchingAgain()
+    public async Task LaunchAsync_RejectsDuplicateSessionForSameAccount()
     {
         var existingSession = ActiveSession();
         var (service, _, launcher, inspector) = CreateService(existingSession);
@@ -41,8 +41,22 @@ public sealed class ClientSessionServiceTests
         var act = () => service.LaunchAsync(AccountId);
 
         await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*already starting or running*");
-        launcher.Verify(value => value.LaunchAsync(It.IsAny<RobloxInstallation>(), null, It.IsAny<CancellationToken>()), Times.Never);
+            .WithMessage("*already has an active*");
+        launcher.Verify(value => value.LaunchAsync(It.IsAny<RobloxInstallation>(), null, It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task LaunchAsync_AllowsDifferentAccountWhileAnotherIsRunning()
+    {
+        var existingSession = ActiveSession();
+        var (service, repository, launcher, inspector) = CreateService(existingSession);
+        inspector.Inspection = RunningInspection();
+
+        var session = await service.LaunchAsync(SecondAccountId);
+
+        session.AccountUsername.Should().Be("ProfileTwo");
+        repository.Sessions.Should().HaveCount(2);
+        launcher.Verify(value => value.LaunchAsync(It.IsAny<RobloxInstallation>(), null, It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -56,21 +70,21 @@ public sealed class ClientSessionServiceTests
 
         await act.Should().ThrowAsync<InvalidOperationException>();
         repository.Sessions.Should().ContainSingle();
-        launcher.Verify(value => value.LaunchAsync(It.IsAny<RobloxInstallation>(), null, It.IsAny<CancellationToken>()), Times.Once);
+        launcher.Verify(value => value.LaunchAsync(It.IsAny<RobloxInstallation>(), null, It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task LaunchAsync_RejectsUnmanagedPlayerWithoutAssociatingIt()
+    public async Task LaunchAsync_AllowsLaunchWhenUnmanagedPlayerIsRunning()
     {
         var (service, repository, launcher, inspector) = CreateService();
         inspector.UnmanagedPlayerRunning = true;
+        inspector.Inspection = RunningInspection();
 
-        var act = () => service.LaunchAsync(AccountId);
+        var session = await service.LaunchAsync(AccountId);
 
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*outside RAM Plus*");
-        repository.Sessions.Should().BeEmpty();
-        launcher.Verify(value => value.LaunchAsync(It.IsAny<RobloxInstallation>(), null, It.IsAny<CancellationToken>()), Times.Never);
+        session.Status.Should().Be(ClientSessionStatus.Running);
+        repository.Sessions.Should().ContainSingle();
+        launcher.Verify(value => value.LaunchAsync(It.IsAny<RobloxInstallation>(), null, It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -139,7 +153,7 @@ public sealed class ClientSessionServiceTests
     public async Task LaunchAsync_RecordsFailureWithoutClaimingAuthentication()
     {
         var (service, repository, launcher, _) = CreateService();
-        launcher.Setup(value => value.LaunchAsync(It.IsAny<RobloxInstallation>(), null, It.IsAny<CancellationToken>()))
+        launcher.Setup(value => value.LaunchAsync(It.IsAny<RobloxInstallation>(), null, It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(LaunchResult.Failed("Signature verification failed."));
 
         var session = await service.LaunchAsync(AccountId);
@@ -154,7 +168,7 @@ public sealed class ClientSessionServiceTests
     public async Task LaunchAsync_WithoutCapturedStartTimeDoesNotAssociateProcess()
     {
         var (service, repository, launcher, inspector) = CreateService();
-        launcher.Setup(value => value.LaunchAsync(It.IsAny<RobloxInstallation>(), null, It.IsAny<CancellationToken>()))
+        launcher.Setup(value => value.LaunchAsync(It.IsAny<RobloxInstallation>(), null, It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(LaunchResult.Succeeded(ProcessId));
         inspector.Inspection = RunningInspection();
 
@@ -168,6 +182,7 @@ public sealed class ClientSessionServiceTests
     }
 
     private static readonly Guid AccountId = Guid.NewGuid();
+    private static readonly Guid SecondAccountId = Guid.NewGuid();
 
     private static (ClientSessionService Service, FakeSessionRepository Repository, Mock<IRobloxLauncher> Launcher, FakeProcessInspector Inspector)
         CreateService(params ClientSession[] sessions)
@@ -175,13 +190,15 @@ public sealed class ClientSessionServiceTests
         var accounts = new Mock<IAccountRepository>();
         accounts.Setup(repository => repository.GetByIdAsync(AccountId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Account { Id = AccountId, Username = "ProfileOne", DisplayName = "One" });
+        accounts.Setup(repository => repository.GetByIdAsync(SecondAccountId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Account { Id = SecondAccountId, Username = "ProfileTwo", DisplayName = "Two" });
 
         var repository = new FakeSessionRepository(sessions);
         var launcher = new Mock<IRobloxLauncher>();
         launcher.Setup(value => value.FindPreferredInstallation())
             .Returns(new RobloxInstallation { ExecutablePath = ExecutablePath, IsSignatureVerified = true });
         launcher.Setup(value => value.LaunchAsync(
-                It.IsAny<RobloxInstallation>(), null, It.IsAny<CancellationToken>()))
+                It.IsAny<RobloxInstallation>(), null, It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(LaunchResult.Succeeded(ProcessId, ProcessStartedAt));
 
         var inspector = new FakeProcessInspector();
@@ -217,7 +234,8 @@ public sealed class ClientSessionServiceTests
 
         public Task AddAsync(ClientSession session, CancellationToken cancellationToken = default)
         {
-            if (Sessions.Any(existing => existing.IsActive) && session.IsActive)
+            // Mirror the service logic: only block duplicate active sessions for the same account.
+            if (Sessions.Any(existing => existing.IsActive && existing.AccountId == session.AccountId) && session.IsActive)
             {
                 throw new ClientSessionConflictException();
             }

@@ -5,7 +5,7 @@ namespace RobloxAccountManager.Infrastructure.Database;
 
 public sealed class DatabaseInitializer
 {
-    private const int LatestSchemaVersion = 2;
+    private const int LatestSchemaVersion = 3;
     private readonly string _connectionString;
     private readonly ILogger<DatabaseInitializer> _logger;
 
@@ -146,6 +146,22 @@ public sealed class DatabaseInitializer
                     CREATE INDEX IF NOT EXISTS IX_ClientSessions_LaunchedAtUtc ON ClientSessions(LaunchedAtUtc);
 
                     INSERT INTO SchemaMigrations (Version, AppliedAtUtc) VALUES (2, $now);
+                ";
+                migrationCmd.Parameters.AddWithValue("$now", DateTime.UtcNow.ToString("o"));
+                await migrationCmd.ExecuteNonQueryAsync(cancellationToken);
+            }
+
+            if (currentVersion < 3)
+            {
+                _logger.LogInformation("Applying migration 3: Allow multi-instance client sessions.");
+                using var migrationCmd = connection.CreateCommand();
+                migrationCmd.Transaction = transaction;
+                migrationCmd.CommandText = @"
+                    DROP INDEX IF EXISTS UQ_ClientSessions_ActiveSlot;
+                    CREATE UNIQUE INDEX IF NOT EXISTS UQ_ClientSessions_AccountId_ActiveSlot
+                        ON ClientSessions(AccountId, ActiveSlot) WHERE ActiveSlot = 1;
+
+                    INSERT INTO SchemaMigrations (Version, AppliedAtUtc) VALUES (3, $now);
                 ";
                 migrationCmd.Parameters.AddWithValue("$now", DateTime.UtcNow.ToString("o"));
                 await migrationCmd.ExecuteNonQueryAsync(cancellationToken);

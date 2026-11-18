@@ -70,7 +70,7 @@ public sealed class SessionsViewModelTests
     }
 
     [Fact]
-    public async Task RefreshAsync_DisablesLaunchWhenAnUnmanagedPlayerIsRunning()
+    public async Task RefreshAsync_AllowsLaunchWhenAnUnmanagedPlayerIsRunning()
     {
         var accountService = new Mock<IAccountService>();
         accountService.Setup(service => service.GetAccountsAsync(It.IsAny<CancellationToken>()))
@@ -83,7 +83,7 @@ public sealed class SessionsViewModelTests
         await viewModel.RefreshAsync();
 
         viewModel.HasUnmanagedPlayerProcess.Should().BeTrue();
-        viewModel.LaunchSelectedCommand.CanExecute(null).Should().BeFalse();
+        viewModel.LaunchSelectedCommand.CanExecute(null).Should().BeTrue();
     }
 
     private static Mock<IClientSessionService> CreateSessionService(IEnumerable<ClientSession>? sessions = null)

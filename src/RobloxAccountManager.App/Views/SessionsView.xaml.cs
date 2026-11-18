@@ -16,7 +16,12 @@ public partial class SessionsView : UserControl
         Unloaded += OnUnloaded;
     }
 
-    private void OnLoaded(object sender, System.Windows.RoutedEventArgs e) => _refreshTimer.Start();
+    private async void OnLoaded(object sender, System.Windows.RoutedEventArgs e)
+    {
+        // Eagerly populate accounts list as soon as the view appears (don't wait for first timer tick)
+        await RefreshSessionsAsync();
+        _refreshTimer.Start();
+    }
 
     private void OnUnloaded(object sender, System.Windows.RoutedEventArgs e) => _refreshTimer.Stop();
 

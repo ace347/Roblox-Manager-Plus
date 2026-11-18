@@ -21,17 +21,20 @@ public interface IRobloxLauncher
     RobloxInstallation? FindPreferredInstallation();
 
     /// <summary>
-    /// Launches the Roblox player using the specified installation and optional place URL.
-    /// Only officially documented roblox:// protocol arguments are permitted.
+    /// Launches the Roblox player using the specified installation, optional place URL, and optional auth ticket.
     /// </summary>
     /// <param name="installation">The validated installation to launch.</param>
     /// <param name="placeUrl">
     /// Optional roblox:// protocol URL (e.g. "roblox://experiences/start?placeId=12345").
     /// Pass null to launch without navigating to a place.
     /// </param>
+    /// <param name="authTicket">
+    /// Optional short-lived rbx-authentication-ticket obtained from Roblox official auth endpoint.
+    /// </param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task<LaunchResult> LaunchAsync(
         RobloxInstallation installation,
         string? placeUrl = null,
+        string? authTicket = null,
         CancellationToken cancellationToken = default);
 }

@@ -43,7 +43,7 @@ public sealed class EndToEndWorkflowTests
         var launcherMock = new Mock<IRobloxLauncher>();
         launcherMock.Setup(l => l.FindPreferredInstallation())
             .Returns(new RobloxInstallation { ExecutablePath = ExecutablePath, IsSignatureVerified = true });
-        launcherMock.Setup(l => l.LaunchAsync(It.IsAny<RobloxInstallation>(), null, It.IsAny<CancellationToken>()))
+        launcherMock.Setup(l => l.LaunchAsync(It.IsAny<RobloxInstallation>(), null, It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(LaunchResult.Succeeded(ProcessId, ProcessStartedAt));
 
         var fakeSessions = new FakeSessionRepository();

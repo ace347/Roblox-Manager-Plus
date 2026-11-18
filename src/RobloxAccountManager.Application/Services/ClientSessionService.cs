@@ -20,18 +20,27 @@ public sealed class ClientSessionService : IClientSessionService, IDisposable
     private readonly IClientSessionRepository _sessions;
     private readonly IClientProcessInspector _processes;
     private readonly IRobloxLauncher _launcher;
+    private readonly ICredentialVault? _credentialVault;
+    private readonly IRobloxAuthTicketService? _authTicketService;
+    private readonly IRobloxMultiInstanceManager? _multiInstanceManager;
     private readonly SemaphoreSlim _operationGate = new(1, 1);
 
     public ClientSessionService(
         IAccountRepository accounts,
         IClientSessionRepository sessions,
         IClientProcessInspector processes,
-        IRobloxLauncher launcher)
+        IRobloxLauncher launcher,
+        ICredentialVault? credentialVault = null,
+        IRobloxAuthTicketService? authTicketService = null,
+        IRobloxMultiInstanceManager? multiInstanceManager = null)
     {
         _accounts = accounts;
         _sessions = sessions;
         _processes = processes;
         _launcher = launcher;
+        _credentialVault = credentialVault;
+        _authTicketService = authTicketService;
+        _multiInstanceManager = multiInstanceManager;
     }
 
     public void Dispose() => _operationGate.Dispose();
@@ -70,16 +79,12 @@ public sealed class ClientSessionService : IClientSessionService, IDisposable
         try
         {
             var sessions = await RefreshCoreAsync(cancellationToken);
-            if (sessions.Any(session => session.IsActive))
-            {
-                throw new InvalidOperationException(
-                    "A RAM Plus managed Roblox Player process is already starting or running. Close it before launching another account; independent simultaneous sessions are not supported.");
-            }
 
-            if (await Task.Run(() => _processes.HasUnmanagedRobloxPlayer(Array.Empty<int>()), cancellationToken))
+            // Block launching the SAME account twice simultaneously.
+            if (sessions.Any(session => session.IsActive && session.AccountId == accountId))
             {
                 throw new InvalidOperationException(
-                    "A Roblox Player process is already running outside RAM Plus. Its account and sign-in state cannot be verified; close it in Roblox before launching a managed session.");
+                    "This account already has an active Roblox Player session. Close it before launching again.");
             }
 
             var account = await _accounts.GetByIdAsync(accountId, cancellationToken);
@@ -116,7 +121,28 @@ public sealed class ClientSessionService : IClientSessionService, IDisposable
 
             try
             {
-                var launch = await _launcher.LaunchAsync(installation, cancellationToken: cancellationToken);
+                string? authTicket = null;
+                if (_credentialVault != null && _authTicketService != null)
+                {
+                    using var secretBuffer = await _credentialVault.RetrieveSecretAsync(accountId, cancellationToken);
+                    if (secretBuffer != null && secretBuffer.Length > 0)
+                    {
+                        try
+                        {
+                            authTicket = await _authTicketService.GetAuthTicketAsync(secretBuffer, cancellationToken);
+                            session.AuthenticationStatus = "Authenticated via Ticket";
+                        }
+                        catch (Exception ex)
+                        {
+                            var failureMessage = $"Failed to obtain authentication ticket: {ex.Message}";
+                            await MarkFailedAsync(session, failureMessage, cancellationToken);
+                            throw new InvalidOperationException(failureMessage);
+                        }
+                    }
+                }
+
+                _multiInstanceManager?.Enable();
+                var launch = await _launcher.LaunchAsync(installation, authTicket: authTicket, cancellationToken: cancellationToken);
                 if (!launch.Success || launch.ProcessId is null)
                 {
                     await MarkFailedAsync(session, launch.FailureReason ?? "The operating system did not start Roblox Player.", cancellationToken);

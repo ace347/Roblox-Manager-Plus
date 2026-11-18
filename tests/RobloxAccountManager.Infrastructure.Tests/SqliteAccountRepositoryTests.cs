@@ -92,7 +92,7 @@ public class SqliteAccountRepositoryTests : IDisposable
         tableCommand.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'ClientSessions';";
         var sessionTableCount = await tableCommand.ExecuteScalarAsync();
 
-        version.Should().Be(2L);
+        version.Should().Be(3L);
         sessionTableCount.Should().Be(1L);
     }
 
@@ -133,7 +133,7 @@ public class SqliteAccountRepositoryTests : IDisposable
             await connection.OpenAsync();
             using var command = connection.CreateCommand();
             command.CommandText = @"
-                DELETE FROM SchemaMigrations WHERE Version = 2;
+                DELETE FROM SchemaMigrations WHERE Version >= 2;
                 DROP TABLE ClientSessions;
                 CREATE TABLE ClientSessions (UnexpectedColumn TEXT NOT NULL);
             ";
@@ -147,7 +147,7 @@ public class SqliteAccountRepositoryTests : IDisposable
         using var verificationConnection = _initializer.CreateConnection();
         await verificationConnection.OpenAsync();
         using var verifyCommand = verificationConnection.CreateCommand();
-        verifyCommand.CommandText = "SELECT COUNT(*) FROM SchemaMigrations WHERE Version = 2;";
+        verifyCommand.CommandText = "SELECT COUNT(*) FROM SchemaMigrations WHERE Version >= 2;";
         (await verifyCommand.ExecuteScalarAsync()).Should().Be(0L);
     }
 
@@ -180,33 +180,39 @@ public class SqliteAccountRepositoryTests : IDisposable
     }
 
     [Fact]
-    public async Task ClientSessionRepository_EnforcesOnlyOneActiveManagedSession()
+    public async Task ClientSessionRepository_EnforcesOnlyOneActiveManagedSessionPerAccount()
     {
         var sessionRepository = new SqliteClientSessionRepository(_initializer);
+        var accountId = Guid.NewGuid();
         var first = new ClientSession
         {
-            AccountId = Guid.NewGuid(),
+            AccountId = accountId,
             AccountUsername = "FirstProfile",
             ExecutablePath = @"C:\Roblox\RobloxPlayerBeta.exe",
             Status = ClientSessionStatus.Launching
         };
         await sessionRepository.AddAsync(first);
 
-        var second = new ClientSession
+        var duplicateAccount = new ClientSession
+        {
+            AccountId = accountId,
+            AccountUsername = "FirstProfile",
+            ExecutablePath = @"C:\Roblox\RobloxPlayerBeta.exe",
+            Status = ClientSessionStatus.Launching
+        };
+
+        var act = () => sessionRepository.AddAsync(duplicateAccount);
+        await act.Should().ThrowAsync<ClientSessionConflictException>();
+
+        // A different account CAN have an active session simultaneously
+        var differentAccount = new ClientSession
         {
             AccountId = Guid.NewGuid(),
             AccountUsername = "SecondProfile",
             ExecutablePath = @"C:\Roblox\RobloxPlayerBeta.exe",
             Status = ClientSessionStatus.Launching
         };
-
-        var act = () => sessionRepository.AddAsync(second);
-
-        await act.Should().ThrowAsync<ClientSessionConflictException>();
-        first.Status = ClientSessionStatus.Exited;
-        first.EndedAtUtc = DateTime.UtcNow;
-        await sessionRepository.UpdateAsync(first);
-        await sessionRepository.AddAsync(second);
+        await sessionRepository.AddAsync(differentAccount);
 
         (await sessionRepository.GetAllAsync()).Should().HaveCount(2);
     }

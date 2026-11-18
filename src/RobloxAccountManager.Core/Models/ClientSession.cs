@@ -41,5 +41,5 @@ public sealed class ClientSession
         or ClientSessionStatus.Running
         or ClientSessionStatus.StatusUnavailable;
 
-    public string AuthenticationStatus { get; init; } = "Unverified; check sign-in in Roblox Player";
+    public string AuthenticationStatus { get; set; } = "Unverified; check sign-in in Roblox Player";
 }

@@ -49,13 +49,15 @@
                     </Grid.ColumnDefinitions>
                     <ComboBox ItemsSource="{Binding Accounts}" SelectedItem="{Binding SelectedAccount}"
                               DisplayMemberPath="Username" Margin="0,0,12,0" MinWidth="220"
+                              Background="#1F2230" Foreground="{StaticResource TextPrimaryBrush}"
+                              BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
                               AutomationProperties.Name="Account profile to launch"/>
                     <Button Grid.Column="1" Content="Launch in Roblox Player"
                             Style="{StaticResource PrimaryAccentButton}"
                             Command="{Binding LaunchSelectedCommand}"/>
                 </Grid>
             </Border>
-            <TextBlock Text="Sign in manually in the official Roblox client. RAM Plus cannot confirm which account is authenticated. Only one managed or externally running Player process is allowed at a time."
+            <TextBlock Text="Multiple accounts can be launched simultaneously. Each account gets its own authenticated Roblox Player session."
                        Margin="2,8,2,0" FontSize="12" Foreground="{StaticResource TextMutedBrush}"
                        TextWrapping="Wrap"/>
         </StackPanel>

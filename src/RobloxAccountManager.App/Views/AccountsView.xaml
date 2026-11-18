@@ -19,6 +19,7 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
                 <StackPanel>
@@ -28,7 +29,25 @@
                 </StackPanel>
 
                 <Button Grid.Column="1" Content="+ Add Account" Style="{StaticResource PrimaryAccentButton}" 
-                        Command="{Binding OpenAddDialogCommand}" VerticalAlignment="Center"/>
+                        Command="{Binding OpenAddDialogCommand}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <!-- Login with Roblox: opens embedded WebView2 and auto-captures the session cookie -->
+                <Button Grid.Column="2" Content="🔑 Login with Roblox"
+                        Background="#1E3A8A" Foreground="#93C5FD" FontWeight="SemiBold"
+                        BorderThickness="0" Padding="14,8" Cursor="Hand" VerticalAlignment="Center"
+                        Command="{Binding LoginWithRobloxCommand}">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="bd" Property="Background" Value="#1D4ED8"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
             </Grid>
 
             <!-- Search & Filters Toolbar -->
@@ -139,6 +158,11 @@
 
                                 <!-- Actions -->
                                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button Content="▶ Launch" Background="#1E3A8A" Foreground="#60A5FA" FontWeight="SemiBold"
+                                            Padding="12,6" Margin="0,0,8,0" BorderThickness="0" Cursor="Hand"
+                                            Command="{Binding DataContext.LaunchAccountCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}"/>
+
                                     <Button Content="★ Set Default" Background="#222533" Foreground="{StaticResource TextSecondaryBrush}"
                                             Padding="10,6" Margin="0,0,8,0" BorderThickness="0" Cursor="Hand"
                                             Command="{Binding DataContext.SetAsDefaultCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
@@ -177,7 +201,11 @@
                     <TextBox Text="{Binding FormTag, UpdateSourceTrigger=PropertyChanged}" Background="#1F2230" Foreground="White" Padding="8" Margin="0,0,0,12"/>
 
                     <TextBlock Text="Personal Notes" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4"/>
-                    <TextBox Text="{Binding FormNotes, UpdateSourceTrigger=PropertyChanged}" Height="60" TextWrapping="Wrap" AcceptsReturn="True" Background="#1F2230" Foreground="White" Padding="8" Margin="0,0,0,12"/>
+                    <TextBox Text="{Binding FormNotes, UpdateSourceTrigger=PropertyChanged}" Height="50" TextWrapping="Wrap" AcceptsReturn="True" Background="#1F2230" Foreground="White" Padding="8" Margin="0,0,0,12"/>
+
+                    <TextBlock Text="Roblox Security Cookie (.ROBLOSECURITY) [Optional]" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                    <TextBox Text="{Binding FormCookie, UpdateSourceTrigger=PropertyChanged}" Background="#1F2230" Foreground="#60A5FA" Padding="8" Margin="0,0,0,6"/>
+                    <TextBlock Text="Encrypted locally using Windows DPAPI. Used to automatically generate launch tickets." FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,14"/>
 
                     <CheckBox IsChecked="{Binding FormIsDefault}" Content="Mark as Default Account" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,20"/>
 
