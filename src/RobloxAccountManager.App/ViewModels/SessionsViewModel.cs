@@ -169,6 +169,38 @@ public partial class SessionsViewModel : ObservableObject
         ErrorMessage = closeError;
     }
 
+    [RelayCommand]
+    private async Task ClearInactiveAsync()
+    {
+        try
+        {
+            await _sessionsService.ClearInactiveSessionsAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Unable to clear inactive sessions: {ex.Message}";
+        }
+
+        await RefreshAsync();
+    }
+
+    [RelayCommand]
+    private async Task DismissSessionAsync(ClientSession? session)
+    {
+        if (session is null) return;
+
+        try
+        {
+            await _sessionsService.DeleteSessionAsync(session.Id);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Unable to remove session record: {ex.Message}";
+        }
+
+        await RefreshAsync();
+    }
+
     private bool CanLaunchSelected() =>
         SelectedAccount is not null &&
         !IsLoading &&

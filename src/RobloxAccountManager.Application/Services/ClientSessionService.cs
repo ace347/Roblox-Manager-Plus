@@ -11,6 +11,8 @@ public interface IClientSessionService
     Task<bool> HasUnmanagedPlayerProcessAsync(CancellationToken cancellationToken = default);
     Task<ClientSession> LaunchAsync(Guid accountId, CancellationToken cancellationToken = default);
     Task<bool> CloseAsync(Guid sessionId, CancellationToken cancellationToken = default);
+    Task DeleteSessionAsync(Guid sessionId, CancellationToken cancellationToken = default);
+    Task ClearInactiveSessionsAsync(CancellationToken cancellationToken = default);
 }
 
 public sealed class ClientSessionService : IClientSessionService, IDisposable
@@ -232,6 +234,32 @@ public sealed class ClientSessionService : IClientSessionService, IDisposable
 
             await _sessions.UpdateAsync(session, cancellationToken);
             return terminated;
+        }
+        finally
+        {
+            _operationGate.Release();
+        }
+    }
+
+    public async Task DeleteSessionAsync(Guid sessionId, CancellationToken cancellationToken = default)
+    {
+        await _operationGate.WaitAsync(cancellationToken);
+        try
+        {
+            await _sessions.DeleteAsync(sessionId, cancellationToken);
+        }
+        finally
+        {
+            _operationGate.Release();
+        }
+    }
+
+    public async Task ClearInactiveSessionsAsync(CancellationToken cancellationToken = default)
+    {
+        await _operationGate.WaitAsync(cancellationToken);
+        try
+        {
+            await _sessions.ClearInactiveAsync(cancellationToken);
         }
         finally
         {

@@ -255,6 +255,18 @@ public sealed class ClientSessionServiceTests
             Sessions[index] = session;
             return Task.CompletedTask;
         }
+
+        public Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
+        {
+            Sessions.RemoveAll(s => s.Id == id);
+            return Task.CompletedTask;
+        }
+
+        public Task ClearInactiveAsync(CancellationToken cancellationToken = default)
+        {
+            Sessions.RemoveAll(s => !s.IsActive);
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class FakeProcessInspector : IClientProcessInspector

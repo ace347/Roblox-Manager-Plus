@@ -16,6 +16,8 @@ public class DashboardViewModelTests
             .ReturnsAsync(processCount);
         sessions.Setup(service => service.HasUnmanagedPlayerProcessAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
+        sessions.Setup(service => service.RefreshAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<ClientSession>());
         return sessions;
     }
 

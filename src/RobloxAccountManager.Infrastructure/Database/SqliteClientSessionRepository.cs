@@ -102,6 +102,27 @@ public sealed class SqliteClientSessionRepository : IClientSessionRepository
         }
     }
 
+    public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var connection = _database.CreateConnection();
+        await connection.OpenAsync(cancellationToken);
+
+        using var command = connection.CreateCommand();
+        command.CommandText = "DELETE FROM ClientSessions WHERE Id = $id;";
+        command.Parameters.AddWithValue("$id", id.ToString());
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task ClearInactiveAsync(CancellationToken cancellationToken = default)
+    {
+        using var connection = _database.CreateConnection();
+        await connection.OpenAsync(cancellationToken);
+
+        using var command = connection.CreateCommand();
+        command.CommandText = "DELETE FROM ClientSessions WHERE ActiveSlot = 0 OR Status IN ('Exited', 'LaunchFailed', 'StatusUnavailable');";
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
     private static void AddParameters(SqliteCommand command, ClientSession session)
     {
         command.Parameters.AddWithValue("$id", session.Id.ToString());

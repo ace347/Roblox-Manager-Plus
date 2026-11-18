@@ -1,21 +1,43 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 using RobloxAccountManager.App.ViewModels;
 
 namespace RobloxAccountManager.App.Views;
 
 public partial class AccountsView : UserControl
 {
+    private readonly DispatcherTimer _refreshTimer;
+
     public AccountsView()
     {
         InitializeComponent();
+        _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+        _refreshTimer.Tick += async (_, _) =>
+        {
+            if (DataContext is AccountsViewModel vm)
+            {
+                await vm.RefreshRunningSessionsAsync();
+            }
+        };
         Loaded += OnLoaded;
+        Unloaded += OnUnloaded;
     }
 
-    private void OnLoaded(object sender, RoutedEventArgs e)
+    private async void OnLoaded(object sender, RoutedEventArgs e)
     {
         if (DataContext is AccountsViewModel vm)
+        {
+            vm.RequestRobloxLogin -= OpenRobloxLoginWindowAsync;
             vm.RequestRobloxLogin += OpenRobloxLoginWindowAsync;
+            await vm.RefreshRunningSessionsAsync();
+        }
+        _refreshTimer.Start();
+    }
+
+    private void OnUnloaded(object sender, RoutedEventArgs e)
+    {
+        _refreshTimer.Stop();
     }
 
     /// <summary>

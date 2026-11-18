@@ -135,9 +135,25 @@
                                                     <Border Background="#251F38" CornerRadius="4" Padding="6,2" Margin="8,0,0,0">
                                                         <TextBlock Text="{Binding Tag}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource AccentPurpleBrush}"/>
                                                     </Border>
+                                                    <Border Background="#064E3B" BorderBrush="#10B981" BorderThickness="1" CornerRadius="4" Padding="6,2" Margin="8,0,0,0"
+                                                            Visibility="{Binding IsRunning, Converter={StaticResource BoolToVis}}">
+                                                        <TextBlock Text="● RUNNING" FontSize="9" FontWeight="Bold" Foreground="#34D399"/>
+                                                    </Border>
                                                 </StackPanel>
                                                 <TextBlock Text="{Binding Username}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0"/>
-                                                <TextBlock Text="{Binding AuthenticationStatus}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0"/>
+                                                <TextBlock Text="{Binding AuthenticationStatus}" FontSize="11" Margin="0,2,0,0">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                                                                    <Setter Property="Foreground" Value="#34D399"/>
+                                                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
                                             </StackPanel>
 
                                             <!-- Launch Action -->

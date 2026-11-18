@@ -115,6 +115,8 @@ public partial class AccountsViewModel : ObservableObject
             {
                 SelectedAccount = Accounts[0];
             }
+
+            await RefreshRunningSessionsAsync();
         }
         catch (Exception)
         {
@@ -123,6 +125,44 @@ public partial class AccountsViewModel : ObservableObject
         finally
         {
             IsLoading = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task RefreshRunningSessionsAsync()
+    {
+        if (_sessionService == null) return;
+
+        try
+        {
+            var sessions = await _sessionService.RefreshAsync();
+            var activeByAccountId = sessions
+                .Where(s => s.IsActive)
+                .ToDictionary(s => s.AccountId, s => s);
+
+            foreach (var account in Accounts)
+            {
+                if (activeByAccountId.TryGetValue(account.Id, out var session))
+                {
+                    account.IsRunning = true;
+                    account.SessionId = session.Id;
+                    account.RunningProcessId = session.ProcessId;
+                    account.AuthenticationStatus = session.ProcessId.HasValue
+                        ? $"● Running (PID: {session.ProcessId})"
+                        : "● Running";
+                }
+                else
+                {
+                    account.IsRunning = false;
+                    account.SessionId = null;
+                    account.RunningProcessId = null;
+                    account.AuthenticationStatus = "Sign-in status not verified";
+                }
+            }
+        }
+        catch
+        {
+            // Transient background refresh failure, ignore
         }
     }
 
@@ -171,10 +211,28 @@ public partial class AccountsViewModel : ObservableObject
         {
             ErrorMessage = null;
             await _sessionService.LaunchAsync(account.Id);
+            await RefreshRunningSessionsAsync();
         }
         catch (Exception ex)
         {
             ErrorMessage = $"Failed to launch {account.Username}: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private async Task CloseAccountSessionAsync(AccountDisplayModel? account)
+    {
+        if (account == null || _sessionService == null || !account.SessionId.HasValue) return;
+
+        try
+        {
+            ErrorMessage = null;
+            await _sessionService.CloseAsync(account.SessionId.Value);
+            await RefreshRunningSessionsAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Failed to close session for {account.Username}: {ex.Message}";
         }
     }
 

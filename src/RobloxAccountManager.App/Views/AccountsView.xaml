@@ -150,9 +150,25 @@
                                                 Visibility="{Binding IsDefault, Converter={StaticResource BoolToVis}}">
                                             <TextBlock Text="★ DEFAULT" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentGreenBrush}"/>
                                         </Border>
+                                        <Border Background="#064E3B" BorderBrush="#10B981" BorderThickness="1" CornerRadius="4" Padding="6,2" Margin="8,0,0,0"
+                                                Visibility="{Binding IsRunning, Converter={StaticResource BoolToVis}}">
+                                            <TextBlock Text="● RUNNING" FontSize="10" FontWeight="Bold" Foreground="#34D399"/>
+                                        </Border>
                                     </StackPanel>
                                     <TextBlock Text="{Binding Username}" FontSize="13" Foreground="{StaticResource AccentElectricBlueBrush}" Margin="0,2,0,0"/>
-                                    <TextBlock Text="{Binding AuthenticationStatus}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0"/>
+                                    <TextBlock Text="{Binding AuthenticationStatus}" FontSize="11" Margin="0,2,0,0">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                                                        <Setter Property="Foreground" Value="#34D399"/>
+                                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
                                     <TextBlock Text="{Binding Notes}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,4,0,0" TextTrimming="CharacterEllipsis"/>
                                 </StackPanel>
 
@@ -161,20 +177,26 @@
                                     <Button Content="▶ Launch" Background="#1E3A8A" Foreground="#60A5FA" FontWeight="SemiBold"
                                             Padding="12,6" Margin="0,0,8,0" BorderThickness="0" Cursor="Hand"
                                             Command="{Binding DataContext.LaunchAccountCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                            CommandParameter="{Binding}"/>
+                                            CommandParameter="{Binding}"
+                                            Visibility="{Binding IsRunning, Converter={StaticResource InverseBoolToVis}}"/>
 
-                                    <Button Content="★ Set Default" Background="#222533" Foreground="{StaticResource TextSecondaryBrush}"
-                                            Padding="10,6" Margin="0,0,8,0" BorderThickness="0" Cursor="Hand"
+                                    <Button Content="⏹ Close" Background="#3D1A24" Foreground="#F87171" FontWeight="SemiBold"
+                                            Padding="12,6" Margin="0,0,8,0" BorderThickness="0" Cursor="Hand"
+                                            Command="{Binding DataContext.CloseAccountSessionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}"
+                                            Visibility="{Binding IsRunning, Converter={StaticResource BoolToVis}}"/>
+
+                                    <Button Content="★ Set Default" Style="{StaticResource SecondaryButton}"
+                                            Margin="0,0,8,0"
                                             Command="{Binding DataContext.SetAsDefaultCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                             CommandParameter="{Binding}"/>
 
-                                    <Button Content="✏️ Edit" Background="#222533" Foreground="{StaticResource TextSecondaryBrush}"
-                                            Padding="10,6" Margin="0,0,8,0" BorderThickness="0" Cursor="Hand"
+                                    <Button Content="✏️ Edit" Style="{StaticResource SecondaryButton}"
+                                            Margin="0,0,8,0"
                                             Command="{Binding DataContext.OpenEditDialogCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                             CommandParameter="{Binding}"/>
 
-                                    <Button Content="🗑️ Delete" Background="#3D1A24" Foreground="#F87171"
-                                            Padding="10,6" BorderThickness="0" Cursor="Hand"
+                                    <Button Content="🗑️ Delete" Style="{StaticResource DangerButton}"
                                             Command="{Binding DataContext.DeleteAccountCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                             CommandParameter="{Binding}"/>
                                 </StackPanel>

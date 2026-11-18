@@ -68,8 +68,14 @@ public partial class DashboardViewModel : ObservableObject
                 StoredSecretsCount = accounts.Count(account => account.EncryptedSecret.Length > 0);
                 RecentAccounts.Clear();
 
+                var sessions = await _clientSessions.RefreshAsync();
+                var activeSessions = sessions != null
+                    ? sessions.Where(s => s.IsActive).ToDictionary(s => s.AccountId, s => s)
+                    : new Dictionary<Guid, ClientSession>();
+
                 foreach (var acc in accounts.Take(5))
                 {
+                    var isRunning = activeSessions.TryGetValue(acc.Id, out var activeSession);
                     RecentAccounts.Add(new AccountDisplayModel
                     {
                         Id = acc.Id,
@@ -78,7 +84,13 @@ public partial class DashboardViewModel : ObservableObject
                         Tag = acc.Tag ?? "Main",
                         Notes = acc.Notes,
                         IsDefault = acc.IsDefault,
-                        LastActive = acc.LastUsedAtUtc.HasValue ? acc.LastUsedAtUtc.Value.ToLocalTime().ToString("g") : "Never"
+                        LastActive = acc.LastUsedAtUtc.HasValue ? acc.LastUsedAtUtc.Value.ToLocalTime().ToString("g") : "Never",
+                        IsRunning = isRunning,
+                        SessionId = activeSession?.Id,
+                        RunningProcessId = activeSession?.ProcessId,
+                        AuthenticationStatus = isRunning
+                            ? $"● Running (PID: {activeSession?.ProcessId})"
+                            : "Sign-in status not verified"
                     });
                 }
 
@@ -162,10 +174,10 @@ public partial class DashboardViewModel : ObservableObject
     }
 
     private bool CanQuickLaunch() =>
-        SelectedAccount is not null && IsProcessCountAvailable && ActiveSessionsCount == 0 && !HasUnmanagedPlayerProcess && !IsLaunching;
+        SelectedAccount is not null && IsProcessCountAvailable && !IsLaunching;
 
     private bool CanLaunchAccount(AccountDisplayModel? account) =>
-        account is not null && IsProcessCountAvailable && ActiveSessionsCount == 0 && !HasUnmanagedPlayerProcess && !IsLaunching;
+        account is not null && IsProcessCountAvailable && !IsLaunching;
 
     partial void OnSelectedAccountChanged(AccountDisplayModel? value) =>
         QuickLaunchCommand.NotifyCanExecuteChanged();
